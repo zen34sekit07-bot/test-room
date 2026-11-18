@@ -72,6 +72,8 @@
     .modal-card { background: #fff; width: 100%; max-width: 560px; max-height: 92dvh; overflow-y: auto; border-radius: 18px 18px 0 0; padding: 16px 14px calc(16px + env(safe-area-inset-bottom, 0px)); }
     .modal-card img.big { width: 100%; border-radius: 10px; border: 1px solid #d9d9d7; background: #f4f4f2; }
     #ocr-status { color: #2563eb; font-weight: bold; font-size: 14px; min-height: 20px; }
+    #paste-type-row .ptype.on { background: #2563eb; color: #fff; border-color: #2563eb; }
+    .btn-discard { flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -97,9 +99,11 @@
             <div class="steps"><span class="on">1 案件名</span><span>2 原稿</span><span>3 札チェック</span></div>
             <div class="card">
                 <p class="cat-title">STEP 1　案件名を入力</p>
-                <label class="lbl" for="case-name">案件名</label>
+                <div class="row-flex" style="margin-bottom:4px;">
+                    <label class="lbl" for="case-name" style="margin:0;">案件名</label>
+                    <span class="note" style="margin-left:auto;">（任意、未入力で日付が入ります。）</span>
+                </div>
                 <input id="case-name" class="inp" type="text" autocomplete="off">
-                <p class="note">日付が入っています。タップすると日付の後ろから入力できます。同じ名前の案件がある場合は、後ろに（連番）が付きます。</p>
                 <div class="row-flex" style="margin-top:10px;">
                     <button id="btn-step1-back" class="btn-sub" type="button" style="flex:1;">戻る</button>
                     <button id="btn-step1-next" class="btn-primary" type="button" style="flex:2;">次へ ↓</button>
@@ -111,16 +115,48 @@
         <section id="view-step2" class="hidden">
             <div class="steps"><span class="done">1 案件名</span><span class="on">2 原稿</span><span>3 札チェック</span></div>
             <div class="card">
-                <p class="cat-title">STEP 2　名札リスト（原稿）を読み込む</p>
-                <p id="step2-case" style="font-weight:bold; margin:0 0 8px;"></p>
                 <div class="row-flex">
-                    <button id="btn-ms-files" class="btn-sub" type="button" style="flex:1;">📄 ファイルを選ぶ<br><span style="font-size:12px;">まとめてOK・txt/画像/pdf</span></button>
-                    <button id="btn-ms-camera" class="btn-sub" type="button" style="flex:1;">📷 カメラで撮影</button>
+                    <p class="cat-title" style="flex:1; margin:0;">STEP 2　名札リスト（原稿）を読み込む</p>
+                    <button class="btn-danger btn-discard" type="button">✕ 破棄して一覧へ</button>
                 </div>
-                <button id="btn-ms-paste" class="btn-sub" type="button" style="width:100%; margin-top:8px;">✏️ 文字を直接貼り付ける</button>
+                <p id="step2-case" style="font-weight:bold; margin:8px 0;"></p>
+                <div class="row-flex">
+                    <button id="btn-ms-files" class="btn-sub" type="button" style="flex:1;">📄 ファイルを選ぶ<br><span style="font-size:12px;">まとめてOK・txt/pdf/画像</span></button>
+                    <button id="btn-ms-gallery" class="btn-sub" type="button" style="flex:1;">🖼 ギャラリーから<br><span style="font-size:12px;">写真・画像を選ぶ</span></button>
+                </div>
+                <div class="row-flex" style="margin-top:8px;">
+                    <button id="btn-ms-camera" class="btn-sub" type="button" style="flex:1;">📷 カメラで撮影</button>
+                    <button id="btn-ms-paste" class="btn-sub" type="button" style="flex:1;">✏️ 文字を入力・貼り付け</button>
+                </div>
                 <div id="paste-box" class="hidden" style="margin-top:10px;">
-                    <textarea id="paste-text" class="inp" rows="6" placeholder="1行＝札1枚分で貼り付けてください"></textarea>
-                    <button id="btn-paste-add" class="btn-primary" type="button" style="margin-top:8px;">この内容で追加</button>
+                    <p class="lbl">入力タイプ</p>
+                    <div class="row-flex" id="paste-type-row">
+                        <button type="button" class="btn-sub ptype on" data-ptype="paste" style="flex:1;">📩 そのまま<br>貼り付け</button>
+                        <button type="button" class="btn-sub ptype" data-ptype="person" style="flex:1;">👤 個人名</button>
+                        <button type="button" class="btn-sub ptype" data-ptype="company" style="flex:1;">🏢 会社・団体</button>
+                    </div>
+                    <div id="panel-paste" style="margin-top:10px;">
+                        <p class="note" style="margin:0 0 6px;">LINEなどで送られてきたものをそのまま貼り付け（1行＝札1枚分）</p>
+                        <textarea id="paste-text" class="inp" rows="6" placeholder="1行＝札1枚分で貼り付けてください"></textarea>
+                        <button id="btn-paste-add" class="btn-primary" type="button" style="margin-top:8px;">この内容で追加</button>
+                    </div>
+                    <div id="panel-person" class="hidden" style="margin-top:10px;">
+                        <p class="note" style="margin:0 0 6px;">個人名を正確に入力（連名は「＋連名を追加」で足せます）</p>
+                        <div id="person-names">
+                            <input class="inp person-name" type="text" placeholder="氏名（1人目）" style="margin-bottom:8px;">
+                        </div>
+                        <button id="btn-person-addname" class="btn-sub" type="button" style="width:100%;">＋ 連名を追加</button>
+                        <label class="note" style="display:flex; align-items:center; gap:6px; margin-top:10px; font-size:14px; color:#262626;"><input type="checkbox" id="person-sama" checked style="width:18px; height:18px;"> 末尾に「様」をつける</label>
+                        <button id="btn-person-add" class="btn-primary" type="button" style="margin-top:8px;">この名札を追加</button>
+                    </div>
+                    <div id="panel-company" class="hidden" style="margin-top:10px;">
+                        <p class="note" style="margin:0 0 6px;">会社・団体名を正確に入力</p>
+                        <input id="company-org" class="inp" type="text" placeholder="会社・団体名" style="margin-bottom:8px;">
+                        <input id="company-title" class="inp" type="text" placeholder="肩書（例：代表取締役）" style="margin-bottom:8px;">
+                        <input id="company-name" class="inp" type="text" placeholder="名前" style="margin-bottom:8px;">
+                        <label class="note" style="display:flex; align-items:center; gap:6px; font-size:14px; color:#262626;"><input type="checkbox" id="company-sama" checked style="width:18px; height:18px;"> 末尾に「様」をつける</label>
+                        <button id="btn-company-add" class="btn-primary" type="button" style="margin-top:8px;">この名札を追加</button>
+                    </div>
                 </div>
                 <p id="ocr-status"></p>
                 <div id="src-list" style="margin-top:6px;"></div>
@@ -136,7 +172,10 @@
         <section id="view-step3" class="hidden">
             <div class="steps"><span class="done">1 案件名</span><span class="done">2 原稿</span><span class="on">3 札チェック</span></div>
             <div class="card">
-                <p class="cat-title">STEP 3　名札を撮影してチェック</p>
+                <div class="row-flex">
+                    <p class="cat-title" style="flex:1; margin:0;">STEP 3　名札を撮影してチェック</p>
+                    <button class="btn-danger btn-discard" type="button">✕ 破棄して一覧へ</button>
+                </div>
                 <p id="step3-case" style="font-weight:bold; margin:0 0 4px;"></p>
                 <p id="step3-progress" style="margin:0 0 8px; font-weight:bold; color:#2563eb;"></p>
                 <div class="prog" style="margin:0 0 10px;"><div id="step3-progbar" style="width:0%"></div></div>
@@ -173,6 +212,7 @@
                 <p id="cam-status" style="color:#2563eb; font-weight:bold; font-size:14px; min-height:20px; margin:8px 0 0;"></p>
                 <button id="btn-shutter" class="btn-primary" type="button" style="margin-top:8px;">📸 撮影する</button>
                 <button id="btn-cam-close" class="btn-sub" type="button" style="width:100%; margin-top:8px;">閉じる（戻る）</button>
+                <button class="btn-danger btn-discard" type="button" style="width:100%; margin-top:8px; padding:10px;">✕ この案件を破棄して一覧へ</button>
             </div>
         </section>
     </div>
@@ -183,6 +223,7 @@
     </div>
 
     <input type="file" id="file-ms" accept=".txt,.csv,.pdf,image/*,text/plain,application/pdf" multiple class="hidden">
+    <input type="file" id="file-ms-gallery" accept="image/*" multiple class="hidden">
     <input type="file" id="file-tag" accept="image/*,.pdf,application/pdf" class="hidden">
     <canvas id="work-canvas" class="hidden"></canvas>
 
@@ -204,6 +245,12 @@ function loadState() {
 let S = loadState();
 function saveState() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {} }
 const activeCase = () => S.cases.find(c => c.id === S.activeId) || null;
+const touch = cs => { if (cs) cs.updated = Date.now(); };
+const fmtTs = ts => {
+    if (!ts) return '';
+    const d = new Date(ts);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+};
 const allEntries = cs => cs.sources.flatMap(src => src.entries.map((entry, idx) => ({ src, idx, entry })));
 const passedKeys = cs => {
     const set = new Set();
@@ -232,11 +279,14 @@ function renderCases() {
         const p = caseProgress(cs);
         const div = document.createElement('div'); div.className = 'case-item';
         div.innerHTML = '<div class="nm">' + esc(cs.name) + '</div>' +
+            '<div class="note">作成：' + fmtTs(cs.created) + (cs.updated && cs.updated - cs.created > 60000 ? '　／　更新：' + fmtTs(cs.updated) : '') + '</div>' +
             '<div class="note">原稿 ' + cs.sources.length + '件（札 ' + p.total + '枚分）／ チェック済み ' + p.passed + ' / ' + p.total + ' 枚</div>' +
             '<div class="prog"><div style="width:' + (p.total ? p.passed / p.total * 100 : 0) + '%"></div></div>';
         const row = document.createElement('div'); row.className = 'row-flex'; row.style.marginTop = '8px';
         const open = document.createElement('button'); open.type = 'button'; open.className = 'btn-primary'; open.style.flex = '2'; open.style.padding = '10px'; open.textContent = '開く';
         open.addEventListener('click', () => { S.activeId = cs.id; saveState(); goStep2(); });
+        const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'btn-sub'; edit.style.flex = '1'; edit.textContent = '編集';
+        edit.addEventListener('click', () => openRenameModal(cs));
         const del = document.createElement('button'); del.type = 'button'; del.className = 'btn-danger'; del.style.flex = '1'; del.textContent = '削除';
         del.addEventListener('click', () => {
             if (!confirm('案件「' + cs.name + '」を削除します。原稿もチェック結果も消えます。')) return;
@@ -244,17 +294,47 @@ function renderCases() {
             if (S.activeId === cs.id) S.activeId = null;
             saveState(); renderCases();
         });
-        row.appendChild(open); row.appendChild(del); div.appendChild(row);
+        row.appendChild(open); row.appendChild(edit); row.appendChild(del); div.appendChild(row);
         box.appendChild(div);
     }
 }
-function dedupeName(base) {
-    const names = new Set(S.cases.map(c => c.name));
+function openRenameModal(cs) {
+    const card = document.getElementById('modal-card');
+    card.innerHTML = '<p class="cat-title">案件名の編集</p>';
+    const inp = document.createElement('input');
+    inp.className = 'inp'; inp.type = 'text'; inp.value = cs.name;
+    card.appendChild(inp);
+    const save = document.createElement('button');
+    save.type = 'button'; save.className = 'btn-primary'; save.textContent = '保存'; save.style.marginTop = '10px';
+    save.addEventListener('click', () => {
+        const v = inp.value.trim();
+        if (!v) { alert('案件名を入力してください'); return; }
+        cs.name = dedupeName(v, cs.id); touch(cs); saveState(); renderCases(); closeModal();
+    });
+    card.appendChild(save);
+    const cancel = document.createElement('button');
+    cancel.type = 'button'; cancel.className = 'btn-sub'; cancel.textContent = 'キャンセル'; cancel.style.width = '100%'; cancel.style.marginTop = '8px';
+    cancel.addEventListener('click', closeModal);
+    card.appendChild(cancel);
+    document.getElementById('modal-bg').classList.remove('hidden');
+    setTimeout(() => inp.focus(), 60);
+}
+function dedupeName(base, exceptId) {
+    const names = new Set(S.cases.filter(c => c.id !== exceptId).map(c => c.name));
     if (!names.has(base)) return base;
     let n = 2;
     while (names.has(base + '（' + n + '）')) n++;
     return base + '（' + n + '）';
 }
+function discardActiveCase() {
+    if (!confirm('入力された内容は失われますがよろしいですか？\n（アップしたファイルも全て削除されます）')) return;
+    const cs = activeCase();
+    if (typeof stopCameraStream === 'function') stopCameraStream();
+    if (cs) S.cases = S.cases.filter(x => x.id !== cs.id);
+    S.activeId = null; saveState();
+    renderCases(); showView('view-cases');
+}
+document.querySelectorAll('.btn-discard').forEach(b => b.addEventListener('click', discardActiveCase));
 document.getElementById('btn-new-case').addEventListener('click', () => {
     const now = new Date();
     const prefix = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0') + ' ';
@@ -265,9 +345,12 @@ document.getElementById('btn-new-case').addEventListener('click', () => {
 });
 document.getElementById('btn-step1-back').addEventListener('click', () => { renderCases(); showView('view-cases'); });
 document.getElementById('btn-step1-next').addEventListener('click', () => {
-    const raw = document.getElementById('case-name').value.trim();
-    if (!raw) { alert('案件名を入力してください'); return; }
-    const cs = { id: uid(), name: dedupeName(raw), created: Date.now(), sources: [], tags: [] };
+    let raw = document.getElementById('case-name').value.trim();
+    if (!raw) {
+        const now = new Date();
+        raw = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+    }
+    const cs = { id: uid(), name: dedupeName(raw), created: Date.now(), updated: Date.now(), sources: [], tags: [] };
     S.cases.unshift(cs); S.activeId = cs.id; saveState();
     goStep2();
 });
@@ -284,7 +367,7 @@ function renderSources() {
     if (!cs || !cs.sources.length) { box.innerHTML = '<p class="note">まだ原稿が読み込まれていません</p>'; return; }
     for (const src of cs.sources) {
         const div = document.createElement('div'); div.className = 'src-item';
-        div.innerHTML = '<div class="nm">' + (src.kind === 'photo' ? '📷 ' : src.kind === 'paste' ? '✏️ ' : '📄 ') + esc(src.label) + '</div>' +
+        div.innerHTML = '<div class="nm">' + (src.kind === 'photo' ? '📷 ' : (src.kind === 'paste' || src.kind === 'form') ? '✏️ ' : '📄 ') + esc(src.label) + '</div>' +
             '<div class="note">札 ' + src.entries.length + '枚分を読み込みました</div>';
         const row = document.createElement('div'); row.className = 'row-flex'; row.style.marginTop = '8px';
         const view = document.createElement('button'); view.type = 'button'; view.className = 'btn-sub'; view.style.flex = '1'; view.textContent = '中身を見る';
@@ -293,7 +376,7 @@ function renderSources() {
         del.addEventListener('click', () => {
             if (!confirm('原稿「' + src.label + '」を削除します。')) return;
             cs.sources = cs.sources.filter(x => x.id !== src.id);
-            saveState(); renderSources();
+            touch(cs); saveState(); renderSources();
         });
         row.appendChild(view); row.appendChild(del); div.appendChild(row);
         box.appendChild(div);
@@ -304,7 +387,15 @@ function addSource(label, kind, lines) {
     const entries = lines.map(l => l.trim()).filter(l => normalize(l).length >= 2);
     if (!entries.length) { alert('読み取れる文字がありませんでした'); return; }
     cs.sources.push({ id: uid(), label, kind, entries });
-    saveState(); renderSources();
+    touch(cs); saveState(); renderSources();
+}
+function addFormEntry(entry) {
+    const cs = activeCase(); if (!cs) return;
+    if (normalize(entry).length < 2) { alert('内容が短すぎます'); return; }
+    let src = cs.sources.find(s => s.kind === 'form');
+    if (!src) { src = { id: uid(), label: '手入力', kind: 'form', entries: [] }; cs.sources.push(src); }
+    src.entries.push(entry);
+    touch(cs); saveState(); renderSources();
 }
 document.getElementById('btn-ms-files').addEventListener('click', () => document.getElementById('file-ms').click());
 document.getElementById('file-ms').addEventListener('change', async e => {
@@ -336,7 +427,46 @@ async function readManuscriptFile(f) {
         alert('「' + f.name + '」の読み込みに失敗しました');
     } finally { status.textContent = ''; }
 }
+document.getElementById('btn-ms-gallery').addEventListener('click', () => document.getElementById('file-ms-gallery').click());
+document.getElementById('file-ms-gallery').addEventListener('change', async e => {
+    const files = Array.from(e.target.files || []); e.target.value = '';
+    for (const f of files) await readManuscriptFile(f);
+});
 document.getElementById('btn-ms-paste').addEventListener('click', () => document.getElementById('paste-box').classList.toggle('hidden'));
+let pasteType = 'paste';
+document.querySelectorAll('#paste-type-row .ptype').forEach(b => b.addEventListener('click', () => {
+    pasteType = b.dataset.ptype;
+    document.querySelectorAll('#paste-type-row .ptype').forEach(x => x.classList.toggle('on', x === b));
+    document.getElementById('panel-paste').classList.toggle('hidden', pasteType !== 'paste');
+    document.getElementById('panel-person').classList.toggle('hidden', pasteType !== 'person');
+    document.getElementById('panel-company').classList.toggle('hidden', pasteType !== 'company');
+}));
+document.getElementById('btn-person-addname').addEventListener('click', () => {
+    const box = document.getElementById('person-names');
+    const inp = document.createElement('input');
+    inp.className = 'inp person-name'; inp.type = 'text';
+    inp.placeholder = '氏名（' + (box.querySelectorAll('.person-name').length + 1) + '人目・連名）';
+    inp.style.marginBottom = '8px';
+    box.appendChild(inp); inp.focus();
+});
+document.getElementById('btn-person-add').addEventListener('click', () => {
+    const names = Array.from(document.querySelectorAll('.person-name')).map(i => i.value.trim()).filter(Boolean);
+    if (!names.length) { alert('氏名を入力してください'); return; }
+    const entry = names.join('　') + (document.getElementById('person-sama').checked ? ' 様' : '');
+    addFormEntry(entry);
+    document.getElementById('person-names').innerHTML = '<input class="inp person-name" type="text" placeholder="氏名（1人目）" style="margin-bottom:8px;">';
+});
+document.getElementById('btn-company-add').addEventListener('click', () => {
+    const org = document.getElementById('company-org').value.trim();
+    const title = document.getElementById('company-title').value.trim();
+    const name = document.getElementById('company-name').value.trim();
+    if (!org && !name) { alert('会社・団体名か名前を入力してください'); return; }
+    const entry = [org, title, name].filter(Boolean).join(' ') + (document.getElementById('company-sama').checked ? ' 様' : '');
+    addFormEntry(entry);
+    document.getElementById('company-org').value = '';
+    document.getElementById('company-title').value = '';
+    document.getElementById('company-name').value = '';
+});
 document.getElementById('btn-paste-add').addEventListener('click', () => {
     const cs = activeCase(); if (!cs) return;
     const n = cs.sources.filter(s => s.kind === 'paste').length + 1;
@@ -362,7 +492,7 @@ function openEntriesModal(srcId) {
         card.querySelectorAll('.entry-row').forEach((row, i) => {
             const b = document.createElement('button');
             b.type = 'button'; b.className = 'btn-danger'; b.textContent = '✕';
-            b.addEventListener('click', () => { src.entries.splice(i, 1); saveState(); renderSources(); render(); });
+            b.addEventListener('click', () => { src.entries.splice(i, 1); touch(cs); saveState(); renderSources(); render(); });
             row.appendChild(b);
         });
         const close = document.createElement('button');
@@ -567,7 +697,7 @@ async function addTagFromCanvas(rawCanvas, thumbCanvas) {
         ocrText: best ? best.ocrLine : ocrText.replace(/\n/g, ' '),
         sim: best ? best.sim : 0, ts: Date.now()
     };
-    cs.tags.unshift(tag); saveState(); renderTags();
+    cs.tags.unshift(tag); touch(cs); saveState(); renderTags();
     return tag;
 }
 document.getElementById('btn-tag-file').addEventListener('click', () => document.getElementById('file-tag').click());
@@ -605,12 +735,12 @@ function openTagModal(tagId) {
     if (t.verdict === 'warn' && !t.confirmed) {
         const ok = document.createElement('button');
         ok.type = 'button'; ok.className = 'btn-primary'; ok.textContent = '目で見て正しいので、この札でOKにする';
-        ok.addEventListener('click', () => { t.confirmed = true; saveState(); renderTags(); closeModal(); });
+        ok.addEventListener('click', () => { t.confirmed = true; touch(cs); saveState(); renderTags(); closeModal(); });
         card.appendChild(ok);
     }
     const del = document.createElement('button');
     del.type = 'button'; del.className = 'btn-danger'; del.textContent = 'この結果を削除'; del.style.width = '100%'; del.style.marginTop = '8px'; del.style.padding = '10px';
-    del.addEventListener('click', () => { cs.tags = cs.tags.filter(x => x.id !== t.id); saveState(); renderTags(); closeModal(); });
+    del.addEventListener('click', () => { cs.tags = cs.tags.filter(x => x.id !== t.id); touch(cs); saveState(); renderTags(); closeModal(); });
     card.appendChild(del);
     const close = document.createElement('button');
     close.type = 'button'; close.className = 'btn-primary'; close.textContent = '閉じる'; close.style.marginTop = '8px';
@@ -644,9 +774,12 @@ async function openCamera(mode) {
     ensureOcr();
     if (mode === 'live') { liveState = null; lastAutoSig = ''; camTimer = setInterval(liveTick, 1700); }
 }
-function closeCamera() {
+function stopCameraStream() {
     if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
     if (camTimer) { clearInterval(camTimer); camTimer = null; }
+}
+function closeCamera() {
+    stopCameraStream();
     showView(returnView);
 }
 document.getElementById('btn-cam-close').addEventListener('click', closeCamera);
