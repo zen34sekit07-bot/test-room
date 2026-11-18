@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>名札チェック（試作）</title>
+<title>札あわせ（名札チェック）試作</title>
 <meta name="theme-color" content="#f4f4f2">
 <style>
     * { box-sizing: border-box; }
@@ -20,9 +20,13 @@
     }
     .topbar a { color: #2563eb; font-weight: bold; font-size: 14px; text-decoration: none; white-space: nowrap; }
     .topbar h1 { font-size: 18px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .wrap { max-width: 560px; margin: 0 auto; padding: 12px 12px 190px; display: flex; flex-direction: column; gap: 12px; }
+    .wrap { max-width: 560px; margin: 0 auto; padding: 12px 12px 40px; display: flex; flex-direction: column; gap: 12px; }
     .card { background: #ffffff; border: 2px solid #d9d9d7; border-radius: 14px; padding: 12px; }
     .cat-title { font-size: 16px; font-weight: bold; border-left: 5px solid #2563eb; padding-left: 8px; margin: 0 0 8px; }
+    .steps { display: flex; gap: 6px; }
+    .steps span { flex: 1; text-align: center; font-size: 13px; font-weight: bold; padding: 8px 2px; border-radius: 9px; background: #e4e4e2; color: #6f6f6f; }
+    .steps span.on { background: #2563eb; color: #fff; }
+    .steps span.done { background: #dbeafe; color: #1d4ed8; }
     .lbl { font-size: 14px; font-weight: bold; display: block; margin-bottom: 4px; }
     .inp {
         background: #f4f4f2; border: 2px solid #c6c6c4; color: #262626; border-radius: 10px;
@@ -31,134 +35,349 @@
     .inp:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.3); }
     .btn-primary { background: #2563eb; color: #fff; font-weight: bold; font-size: 16px; padding: 12px 14px; border-radius: 12px; border: 2px solid #2563eb; width: 100%; }
     .btn-primary:active { transform: scale(.98); }
+    .btn-primary:disabled { opacity: .45; }
     .btn-sub { background: #fff; color: #262626; font-weight: bold; font-size: 15px; padding: 10px 14px; border-radius: 12px; border: 2px solid #c6c6c4; white-space: nowrap; }
     .btn-sub:active { transform: scale(.98); }
     .btn-danger { background: #fff; color: #b91c1c; font-weight: bold; font-size: 14px; padding: 8px 10px; border-radius: 10px; border: 2px solid #e5a3a3; white-space: nowrap; }
     .row-flex { display: flex; gap: 8px; align-items: center; }
     .note { font-size: 13px; color: #6f6f6f; line-height: 1.5; }
-    .ms-item { border: 2px solid #d9d9d7; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; background: #fff; }
-    .ms-item .nm { font-size: 16px; font-weight: bold; word-break: break-all; }
+    .case-item, .src-item, .tag-item { border: 2px solid #d9d9d7; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; background: #fff; }
+    .case-item .nm, .src-item .nm { font-size: 16px; font-weight: bold; word-break: break-all; }
     .prog { height: 12px; background: #e4e4e2; border-radius: 999px; margin-top: 6px; overflow: hidden; }
     .prog > div { height: 12px; background: #2563eb; border-radius: 999px; transition: width .25s; }
     #video-box { position: relative; background: #171717; border-radius: 14px; overflow: hidden; }
     #cam-video { width: 100%; display: block; aspect-ratio: 4/3; object-fit: cover; background: #171717; }
-    #guide-frame {
-        position: absolute; left: 6%; right: 6%; top: 26%; height: 44%;
-        border: 3px solid rgba(37,99,235,.95); border-radius: 10px; pointer-events: none;
-        box-shadow: 0 0 0 999px rgba(0,0,0,.28);
-    }
-    #guide-label {
-        position: absolute; left: 6%; top: calc(26% - 30px); color: #fff; font-size: 13px; font-weight: bold;
-        background: rgba(37,99,235,.9); padding: 3px 8px; border-radius: 6px; pointer-events: none;
-    }
-    #result-bar {
-        position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
-        background: #ffffff; border-top: 3px solid #d9d9d7;
-        padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
-        box-shadow: 0 -4px 18px rgba(0,0,0,.12);
-    }
-    #result-bar .inner { max-width: 560px; margin: 0 auto; }
-    #result-verdict { font-size: 19px; font-weight: bold; line-height: 1.3; }
-    #result-verdict.ok { color: #15803d; }
-    #result-verdict.warn { color: #b45309; }
-    #result-verdict.ng { color: #b91c1c; }
-    #result-where { font-size: 14px; font-weight: bold; color: #2563eb; margin-top: 2px; }
-    #result-diff { font-size: 16px; line-height: 1.6; margin-top: 4px; word-break: break-all; }
+    #guide-frame { position: absolute; left: 6%; right: 6%; top: 26%; height: 44%; border: 3px solid rgba(37,99,235,.95); border-radius: 10px; pointer-events: none; box-shadow: 0 0 0 999px rgba(0,0,0,.28); }
+    #guide-label { position: absolute; left: 6%; top: calc(26% - 30px); color: #fff; font-size: 13px; font-weight: bold; background: rgba(37,99,235,.9); padding: 3px 8px; border-radius: 6px; pointer-events: none; }
+    .mark { font-size: 26px; font-weight: bold; width: 44px; height: 44px; border-radius: 999px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 3px solid; background: #fff; }
+    .mark.ok { color: #15803d; border-color: #15803d; }
+    .mark.warn { color: #b45309; border-color: #b45309; }
+    .mark.ng { color: #b91c1c; border-color: #b91c1c; }
+    .tag-item { display: flex; gap: 10px; align-items: center; cursor: pointer; }
+    .tag-item img { width: 64px; height: 48px; object-fit: cover; border-radius: 8px; border: 1px solid #d9d9d7; flex-shrink: 0; background: #f4f4f2; }
+    .tag-item .tx { flex: 1; min-width: 0; font-size: 14px; line-height: 1.45; word-break: break-all; }
+    .tag-item .tx b { font-size: 15px; }
+    #live-result { border: 3px solid #d9d9d7; border-radius: 12px; padding: 10px 12px; background: #fff; }
+    #live-verdict { font-size: 19px; font-weight: bold; line-height: 1.3; }
+    #live-verdict.ok { color: #15803d; } #live-verdict.warn { color: #b45309; } #live-verdict.ng { color: #b91c1c; }
+    #live-where { font-size: 14px; font-weight: bold; color: #2563eb; margin-top: 2px; }
+    #live-diff { font-size: 16px; line-height: 1.6; margin-top: 4px; word-break: break-all; }
     .diff-bad { color: #b91c1c; font-weight: bold; background: #fee2e2; border-radius: 4px; padding: 0 2px; }
-    .diff-ok { color: #262626; }
-    .log-item { font-size: 14px; border-bottom: 1px solid #e4e4e2; padding: 6px 0; line-height: 1.5; word-break: break-all; }
+    .entry-row { display: flex; gap: 8px; align-items: center; border-bottom: 1px solid #e4e4e2; padding: 7px 0; font-size: 15px; }
+    .entry-row .no { color: #2563eb; font-weight: bold; flex-shrink: 0; }
+    .entry-row .et { flex: 1; word-break: break-all; }
     .entry-chip { display: inline-block; background: #f4f4f2; border: 1px solid #d9d9d7; border-radius: 8px; padding: 4px 8px; font-size: 14px; margin: 0 6px 6px 0; word-break: break-all; }
     .entry-chip.done { background: #dbeafe; border-color: #2563eb; color: #1d4ed8; font-weight: bold; }
+    .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 60; display: flex; align-items: flex-end; justify-content: center; }
+    .modal-card { background: #fff; width: 100%; max-width: 560px; max-height: 92dvh; overflow-y: auto; border-radius: 18px 18px 0 0; padding: 16px 14px calc(16px + env(safe-area-inset-bottom, 0px)); }
+    .modal-card img.big { width: 100%; border-radius: 10px; border: 1px solid #d9d9d7; background: #f4f4f2; }
+    #ocr-status { color: #2563eb; font-weight: bold; font-size: 14px; min-height: 20px; }
 </style>
 </head>
 <body>
     <div class="topbar">
         <a href="index.html">← テストルームへ</a>
-        <h1>名札チェック（試作）</h1>
+        <h1 id="app-title">札あわせ（名札チェック）</h1>
     </div>
 
     <div class="wrap">
-        <!-- 原稿 -->
-        <div class="card">
-            <p class="cat-title">① 原稿を用意する</p>
-            <label class="lbl" for="ms-name">原稿の名前</label>
-            <input id="ms-name" class="inp" type="text" placeholder="例：○○家 供花名札リスト">
-            <label class="lbl" for="ms-text" style="margin-top:10px;">原稿の内容（1行＝札1枚分）</label>
-            <textarea id="ms-text" class="inp" rows="6" placeholder="1行に1枚分の文字をそのまま入れてください。ファイルや写真から読み込むと、ここに反映されます。間違いに気づいたら登録前に直せます。"></textarea>
-            <div class="row-flex" style="margin-top:10px;">
-                <button id="btn-ms-file" class="btn-sub" type="button" style="flex:1;">📄 ファイルから</button>
-                <button id="btn-ms-photo" class="btn-sub" type="button" style="flex:1;">📷 写真から</button>
-            </div>
-            <button id="btn-ms-add" class="btn-primary" type="button" style="margin-top:10px;">この内容で原稿を登録</button>
-            <p class="note" style="margin-top:8px;">写真からの読み取りは完璧ではありません。原稿が「正解」になるので、登録前に必ず目で確認して直してください。初回は文字認識の辞書ダウンロードで少し時間がかかります。</p>
-            <p id="ocr-status" class="note" style="color:#2563eb; font-weight:bold; min-height:18px;"></p>
-        </div>
+        <p class="note" style="margin:0;">札名を原稿と照らし合わせて間違いが無いかチェックします。jpg・pdfなどのファイルだけでなく、カメラで撮影したものも判別に使用できます。札の入力では、撮影した札だけでなくカメラ越しのリアルタイム判別も可能です。</p>
 
-        <div id="ms-list"></div>
-
-        <!-- カメラチェック -->
-        <div class="card">
-            <p class="cat-title">② 札をカメラでチェック</p>
-            <div id="video-box">
-                <video id="cam-video" playsinline muted autoplay></video>
-                <div id="guide-frame"></div>
-                <div id="guide-label">札をこの枠に入れる</div>
+        <!-- ===== 画面0：案件一覧 ===== -->
+        <section id="view-cases">
+            <div class="card">
+                <p class="cat-title">案件一覧</p>
+                <div id="case-list"></div>
+                <button id="btn-new-case" class="btn-primary" type="button">＋ 新しい案件を作る</button>
             </div>
-            <div class="row-flex" style="margin-top:10px;">
-                <button id="btn-cam-start" class="btn-primary" type="button" style="flex:1;">📹 カメラ開始</button>
-                <button id="btn-cam-shot" class="btn-sub hidden" type="button" style="flex:1;">今すぐチェック</button>
-            </div>
-            <div class="row-flex" style="margin-top:8px;">
-                <button id="btn-photo-check" class="btn-sub" type="button" style="flex:1;">🖼 札の写真を選んでチェック</button>
-            </div>
-            <p class="note" style="margin-top:8px;">カメラを開始すると、枠の中の札を自動で繰り返し読み取って照合します。明るい場所で、札が大きく写るように近づけてください。</p>
-        </div>
+        </section>
 
-        <!-- 進み具合 -->
-        <div class="card">
-            <p class="cat-title">③ 確認の進み具合</p>
-            <div id="progress-box"></div>
-        </div>
+        <!-- ===== 画面1：案件名 ===== -->
+        <section id="view-step1" class="hidden">
+            <div class="steps"><span class="on">1 案件名</span><span>2 原稿</span><span>3 札チェック</span></div>
+            <div class="card">
+                <p class="cat-title">STEP 1　案件名を入力</p>
+                <label class="lbl" for="case-name">案件名</label>
+                <input id="case-name" class="inp" type="text" autocomplete="off">
+                <p class="note">日付が入っています。タップすると日付の後ろから入力できます。同じ名前の案件がある場合は、後ろに（連番）が付きます。</p>
+                <div class="row-flex" style="margin-top:10px;">
+                    <button id="btn-step1-back" class="btn-sub" type="button" style="flex:1;">戻る</button>
+                    <button id="btn-step1-next" class="btn-primary" type="button" style="flex:2;">次へ ↓</button>
+                </div>
+            </div>
+        </section>
 
-        <!-- 履歴 -->
-        <div class="card">
-            <p class="cat-title">チェック履歴</p>
-            <div id="log-box"><p class="note">まだチェックしていません</p></div>
-        </div>
+        <!-- ===== 画面2：原稿 ===== -->
+        <section id="view-step2" class="hidden">
+            <div class="steps"><span class="done">1 案件名</span><span class="on">2 原稿</span><span>3 札チェック</span></div>
+            <div class="card">
+                <p class="cat-title">STEP 2　名札リスト（原稿）を読み込む</p>
+                <p id="step2-case" style="font-weight:bold; margin:0 0 8px;"></p>
+                <div class="row-flex">
+                    <button id="btn-ms-files" class="btn-sub" type="button" style="flex:1;">📄 ファイルを選ぶ<br><span style="font-size:12px;">まとめてOK・txt/画像/pdf</span></button>
+                    <button id="btn-ms-camera" class="btn-sub" type="button" style="flex:1;">📷 カメラで撮影</button>
+                </div>
+                <button id="btn-ms-paste" class="btn-sub" type="button" style="width:100%; margin-top:8px;">✏️ 文字を直接貼り付ける</button>
+                <div id="paste-box" class="hidden" style="margin-top:10px;">
+                    <textarea id="paste-text" class="inp" rows="6" placeholder="1行＝札1枚分で貼り付けてください"></textarea>
+                    <button id="btn-paste-add" class="btn-primary" type="button" style="margin-top:8px;">この内容で追加</button>
+                </div>
+                <p id="ocr-status"></p>
+                <div id="src-list" style="margin-top:6px;"></div>
+                <p class="note">読み込んだ原稿は「中身を見る」で1行ずつ確認でき、読み間違いの行は消せます。原稿が正解になるので、間違った行は直すか消してください。</p>
+                <div class="row-flex" style="margin-top:10px;">
+                    <button id="btn-step2-back" class="btn-sub" type="button" style="flex:1;">戻る</button>
+                    <button id="btn-step2-next" class="btn-primary" type="button" style="flex:2;">次へ ↓</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 画面3：札チェック ===== -->
+        <section id="view-step3" class="hidden">
+            <div class="steps"><span class="done">1 案件名</span><span class="done">2 原稿</span><span class="on">3 札チェック</span></div>
+            <div class="card">
+                <p class="cat-title">STEP 3　名札を撮影してチェック</p>
+                <p id="step3-case" style="font-weight:bold; margin:0 0 4px;"></p>
+                <p id="step3-progress" style="margin:0 0 8px; font-weight:bold; color:#2563eb;"></p>
+                <div class="prog" style="margin:0 0 10px;"><div id="step3-progbar" style="width:0%"></div></div>
+                <p class="note" style="margin:0 0 8px;">※ 1枚ずつ、周りに他の名札が映らないようにしてください</p>
+                <div class="row-flex">
+                    <button id="btn-tag-camera" class="btn-sub" type="button" style="flex:1;">📷 カメラで撮影</button>
+                    <button id="btn-tag-live" class="btn-sub" type="button" style="flex:1;">🔴 リアルタイム判別</button>
+                </div>
+                <button id="btn-tag-file" class="btn-sub" type="button" style="width:100%; margin-top:8px;">🖼 札の画像ファイルを選ぶ</button>
+                <div id="tag-list" style="margin-top:12px;"></div>
+                <div id="unchecked-box" style="margin-top:10px;"></div>
+                <div class="row-flex" style="margin-top:10px;">
+                    <button id="btn-step3-back" class="btn-sub" type="button" style="flex:1;">戻る</button>
+                    <button id="btn-step3-finish" class="btn-primary" type="button" style="flex:2;">案件一覧へ</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== カメラ画面 ===== -->
+        <section id="view-camera" class="hidden">
+            <div class="card">
+                <p class="cat-title" id="cam-title">カメラ</p>
+                <div id="video-box">
+                    <video id="cam-video" playsinline muted autoplay></video>
+                    <div id="guide-frame"></div>
+                    <div id="guide-label">枠の中に収めてください</div>
+                </div>
+                <div id="live-result" class="hidden" style="margin-top:10px;">
+                    <div id="live-verdict">札を枠に写してください</div>
+                    <div id="live-where"></div>
+                    <div id="live-diff"></div>
+                    <button id="btn-live-record" class="btn-primary hidden" type="button" style="margin-top:8px; padding:10px;">この結果を記録する</button>
+                </div>
+                <p id="cam-status" style="color:#2563eb; font-weight:bold; font-size:14px; min-height:20px; margin:8px 0 0;"></p>
+                <button id="btn-shutter" class="btn-primary" type="button" style="margin-top:8px;">📸 撮影する</button>
+                <button id="btn-cam-close" class="btn-sub" type="button" style="width:100%; margin-top:8px;">閉じる（戻る）</button>
+            </div>
+        </section>
     </div>
 
-    <!-- 結果バー（画面下に固定） -->
-    <div id="result-bar">
-        <div class="inner">
-            <div id="result-verdict">札をカメラに写すか、写真を選んでください</div>
-            <div id="result-where"></div>
-            <div id="result-diff"></div>
-            <button id="btn-mark-ok" class="btn-primary hidden" type="button" style="margin-top:8px; padding:10px;">この札でOK（確認済みにする）</button>
-        </div>
+    <!-- 詳細モーダル -->
+    <div id="modal-bg" class="modal-bg hidden">
+        <div class="modal-card" id="modal-card"></div>
     </div>
 
-    <input type="file" id="file-ms" accept=".txt,.csv,text/plain,text/csv" class="hidden">
-    <input type="file" id="file-ms-photo" accept="image/*" class="hidden">
-    <input type="file" id="file-tag-photo" accept="image/*" class="hidden">
+    <input type="file" id="file-ms" accept=".txt,.csv,.pdf,image/*,text/plain,application/pdf" multiple class="hidden">
+    <input type="file" id="file-tag" accept="image/*,.pdf,application/pdf" class="hidden">
     <canvas id="work-canvas" class="hidden"></canvas>
 
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script>
 'use strict';
 /* ============ 状態 ============ */
-const LS_KEY = 'tool8_nametag_v1';
+const LS_KEY = 'tool8_fuda_v2';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function loadState() {
     try {
         const d = JSON.parse(localStorage.getItem(LS_KEY));
-        if (d && Array.isArray(d.manuscripts)) { d.checked = d.checked || {}; d.log = d.log || []; return d; }
+        if (d && Array.isArray(d.cases)) return d;
     } catch (e) {}
-    return { manuscripts: [], checked: {}, log: [] };
+    return { cases: [], activeId: null };
 }
 let S = loadState();
 function saveState() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {} }
+const activeCase = () => S.cases.find(c => c.id === S.activeId) || null;
+const allEntries = cs => cs.sources.flatMap(src => src.entries.map((entry, idx) => ({ src, idx, entry })));
+const passedKeys = cs => {
+    const set = new Set();
+    for (const t of cs.tags) if ((t.verdict === 'ok' || t.confirmed) && t.srcId) set.add(t.srcId + ':' + t.idx);
+    return set;
+};
 
+/* ============ 画面遷移 ============ */
+const VIEWS = ['view-cases', 'view-step1', 'view-step2', 'view-step3', 'view-camera'];
+function showView(id) {
+    for (const v of VIEWS) document.getElementById(v).classList.toggle('hidden', v !== id);
+    window.scrollTo(0, 0);
+}
+
+/* ============ 案件 ============ */
+function caseProgress(cs) {
+    const total = allEntries(cs).length;
+    const passed = passedKeys(cs).size;
+    return { total, passed };
+}
+function renderCases() {
+    const box = document.getElementById('case-list');
+    box.innerHTML = '';
+    if (!S.cases.length) { box.innerHTML = '<p class="note">まだ案件がありません。「新しい案件を作る」から始めてください。</p>'; return; }
+    for (const cs of S.cases) {
+        const p = caseProgress(cs);
+        const div = document.createElement('div'); div.className = 'case-item';
+        div.innerHTML = '<div class="nm">' + esc(cs.name) + '</div>' +
+            '<div class="note">原稿 ' + cs.sources.length + '件（札 ' + p.total + '枚分）／ チェック済み ' + p.passed + ' / ' + p.total + ' 枚</div>' +
+            '<div class="prog"><div style="width:' + (p.total ? p.passed / p.total * 100 : 0) + '%"></div></div>';
+        const row = document.createElement('div'); row.className = 'row-flex'; row.style.marginTop = '8px';
+        const open = document.createElement('button'); open.type = 'button'; open.className = 'btn-primary'; open.style.flex = '2'; open.style.padding = '10px'; open.textContent = '開く';
+        open.addEventListener('click', () => { S.activeId = cs.id; saveState(); goStep2(); });
+        const del = document.createElement('button'); del.type = 'button'; del.className = 'btn-danger'; del.style.flex = '1'; del.textContent = '削除';
+        del.addEventListener('click', () => {
+            if (!confirm('案件「' + cs.name + '」を削除します。原稿もチェック結果も消えます。')) return;
+            S.cases = S.cases.filter(x => x.id !== cs.id);
+            if (S.activeId === cs.id) S.activeId = null;
+            saveState(); renderCases();
+        });
+        row.appendChild(open); row.appendChild(del); div.appendChild(row);
+        box.appendChild(div);
+    }
+}
+function dedupeName(base) {
+    const names = new Set(S.cases.map(c => c.name));
+    if (!names.has(base)) return base;
+    let n = 2;
+    while (names.has(base + '（' + n + '）')) n++;
+    return base + '（' + n + '）';
+}
+document.getElementById('btn-new-case').addEventListener('click', () => {
+    const now = new Date();
+    const prefix = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0') + ' ';
+    const inp = document.getElementById('case-name');
+    inp.value = prefix;
+    showView('view-step1');
+    setTimeout(() => { inp.focus(); try { inp.setSelectionRange(prefix.length, prefix.length); } catch (e) {} }, 80);
+});
+document.getElementById('btn-step1-back').addEventListener('click', () => { renderCases(); showView('view-cases'); });
+document.getElementById('btn-step1-next').addEventListener('click', () => {
+    const raw = document.getElementById('case-name').value.trim();
+    if (!raw) { alert('案件名を入力してください'); return; }
+    const cs = { id: uid(), name: dedupeName(raw), created: Date.now(), sources: [], tags: [] };
+    S.cases.unshift(cs); S.activeId = cs.id; saveState();
+    goStep2();
+});
+
+/* ============ STEP2：原稿 ============ */
+function goStep2() {
+    const cs = activeCase(); if (!cs) { renderCases(); showView('view-cases'); return; }
+    document.getElementById('step2-case').textContent = '案件：' + cs.name;
+    renderSources(); showView('view-step2');
+}
+function renderSources() {
+    const cs = activeCase(); const box = document.getElementById('src-list');
+    box.innerHTML = '';
+    if (!cs || !cs.sources.length) { box.innerHTML = '<p class="note">まだ原稿が読み込まれていません</p>'; return; }
+    for (const src of cs.sources) {
+        const div = document.createElement('div'); div.className = 'src-item';
+        div.innerHTML = '<div class="nm">' + (src.kind === 'photo' ? '📷 ' : src.kind === 'paste' ? '✏️ ' : '📄 ') + esc(src.label) + '</div>' +
+            '<div class="note">札 ' + src.entries.length + '枚分を読み込みました</div>';
+        const row = document.createElement('div'); row.className = 'row-flex'; row.style.marginTop = '8px';
+        const view = document.createElement('button'); view.type = 'button'; view.className = 'btn-sub'; view.style.flex = '1'; view.textContent = '中身を見る';
+        view.addEventListener('click', () => openEntriesModal(src.id));
+        const del = document.createElement('button'); del.type = 'button'; del.className = 'btn-danger'; del.style.flex = '1'; del.textContent = 'この原稿を削除';
+        del.addEventListener('click', () => {
+            if (!confirm('原稿「' + src.label + '」を削除します。')) return;
+            cs.sources = cs.sources.filter(x => x.id !== src.id);
+            saveState(); renderSources();
+        });
+        row.appendChild(view); row.appendChild(del); div.appendChild(row);
+        box.appendChild(div);
+    }
+}
+function addSource(label, kind, lines) {
+    const cs = activeCase(); if (!cs) return;
+    const entries = lines.map(l => l.trim()).filter(l => normalize(l).length >= 2);
+    if (!entries.length) { alert('読み取れる文字がありませんでした'); return; }
+    cs.sources.push({ id: uid(), label, kind, entries });
+    saveState(); renderSources();
+}
+document.getElementById('btn-ms-files').addEventListener('click', () => document.getElementById('file-ms').click());
+document.getElementById('file-ms').addEventListener('change', async e => {
+    const files = Array.from(e.target.files || []); e.target.value = '';
+    for (const f of files) await readManuscriptFile(f);
+});
+async function readManuscriptFile(f) {
+    const status = document.getElementById('ocr-status');
+    try {
+        if (/\.txt$|\.csv$|text\//i.test(f.name + ' ' + (f.type || '')) && !/pdf/i.test(f.type || '')) {
+            const text = await f.text();
+            addSource(f.name, 'file', text.replace(/\r\n/g, '\n').split(/\n/));
+            return;
+        }
+        status.textContent = '「' + f.name + '」を読み取り中…';
+        if (/pdf/i.test(f.type || '') || /\.pdf$/i.test(f.name)) {
+            const pages = await pdfToCanvases(f);
+            let lines = [];
+            for (const cv of pages) { const d = await ocrCanvas(cv); if (d) lines = lines.concat(extractLines(d)); }
+            addSource(f.name, 'file', lines);
+        } else if ((f.type || '').startsWith('image/')) {
+            const data = await ocrImageFile(f);
+            if (data) addSource(f.name, 'file', extractLines(data));
+            else alert('「' + f.name + '」を読み取れませんでした');
+        } else {
+            alert('対応していないファイルです：' + f.name);
+        }
+    } catch (err) {
+        alert('「' + f.name + '」の読み込みに失敗しました');
+    } finally { status.textContent = ''; }
+}
+document.getElementById('btn-ms-paste').addEventListener('click', () => document.getElementById('paste-box').classList.toggle('hidden'));
+document.getElementById('btn-paste-add').addEventListener('click', () => {
+    const cs = activeCase(); if (!cs) return;
+    const n = cs.sources.filter(s => s.kind === 'paste').length + 1;
+    addSource('貼り付け' + (n > 1 ? '（' + n + '）' : ''), 'paste', document.getElementById('paste-text').value.split(/\n/));
+    document.getElementById('paste-text').value = '';
+    document.getElementById('paste-box').classList.add('hidden');
+});
+document.getElementById('btn-ms-camera').addEventListener('click', () => openCamera('ms'));
+document.getElementById('btn-step2-back').addEventListener('click', () => { renderCases(); showView('view-cases'); });
+document.getElementById('btn-step2-next').addEventListener('click', () => {
+    const cs = activeCase();
+    if (!cs || !allEntries(cs).length) { alert('先に原稿を読み込んでください'); return; }
+    goStep3();
+});
+function openEntriesModal(srcId) {
+    const cs = activeCase(); if (!cs) return;
+    const src = cs.sources.find(s => s.id === srcId); if (!src) return;
+    const card = document.getElementById('modal-card');
+    const render = () => {
+        card.innerHTML = '<p class="cat-title">' + esc(src.label) + '（' + src.entries.length + '枚分）</p>' +
+            src.entries.map((en, i) => '<div class="entry-row"><span class="no">' + (i + 1) + '.</span><span class="et">' + esc(en) + '</span></div>').join('') +
+            '<p class="note">読み間違いの行は、右の✕で消せます（原稿が正解になります）</p>';
+        card.querySelectorAll('.entry-row').forEach((row, i) => {
+            const b = document.createElement('button');
+            b.type = 'button'; b.className = 'btn-danger'; b.textContent = '✕';
+            b.addEventListener('click', () => { src.entries.splice(i, 1); saveState(); renderSources(); render(); });
+            row.appendChild(b);
+        });
+        const close = document.createElement('button');
+        close.type = 'button'; close.className = 'btn-primary'; close.textContent = '閉じる'; close.style.marginTop = '10px';
+        close.addEventListener('click', closeModal);
+        card.appendChild(close);
+    };
+    render();
+    document.getElementById('modal-bg').classList.remove('hidden');
+}
+function closeModal() { document.getElementById('modal-bg').classList.add('hidden'); }
+document.getElementById('modal-bg').addEventListener('click', e => { if (e.target.id === 'modal-bg') closeModal(); });
+</script>
+<script>
+'use strict';
 /* ============ 照合ロジック ============ */
 const normalize = t => String(t || '').replace(/[\s　]/g, '').replace(/[、。，．・:：;；]$/g, '');
 function levenshtein(a, b) {
@@ -167,9 +386,7 @@ function levenshtein(a, b) {
     let prev = Array.from({ length: n + 1 }, (_, j) => j);
     for (let i = 1; i <= m; i++) {
         const cur = [i];
-        for (let j = 1; j <= n; j++) {
-            cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-        }
+        for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
         prev = cur;
     }
     return prev[n];
@@ -179,65 +396,79 @@ const similarity = (a, b) => {
     if (!x || !y) return 0;
     return 1 - levenshtein(x, y) / Math.max(x.length, y.length);
 };
-function matchTag(ocrText) {
+function extractLines(data) {
+    if (data && Array.isArray(data.lines) && data.lines.length) return data.lines.map(l => l.text);
+    return String((data && data.text) || '').split(/\n/);
+}
+function matchTag(cs, ocrText) {
     const lines = String(ocrText || '').split(/\n/).map(l => l.trim()).filter(l => normalize(l).length >= 2);
     let best = null;
-    for (const ms of S.manuscripts) {
-        ms.entries.forEach((entry, idx) => {
-            for (const line of lines) {
-                const sim = similarity(line, entry);
-                if (!best || sim > best.sim) best = { ms, idx, entry, sim, ocrLine: line };
-            }
-            // 行が取れない場合に備え、全文とも照合
-            const simAll = similarity(ocrText, entry);
-            if (!best || simAll > best.sim) best = { ms, idx, entry, sim: simAll, ocrLine: String(ocrText || '').replace(/\n/g, ' ') };
-        });
+    for (const { src, idx, entry } of allEntries(cs)) {
+        for (const line of lines) {
+            const sim = similarity(line, entry);
+            if (!best || sim > best.sim) best = { src, idx, entry, sim, ocrLine: line };
+        }
+        const simAll = similarity(ocrText, entry);
+        if (!best || simAll > best.sim) best = { src, idx, entry, sim: simAll, ocrLine: String(ocrText || '').replace(/\n/g, ' ') };
     }
     return best;
 }
-const entryUid = (ms, idx) => ms.id + ':' + idx;
+function judgeVerdict(best, ocrLine) {
+    if (!best) return 'ng';
+    if (normalize(best.entry) === normalize(ocrLine)) return 'ok';
+    return best.sim >= 0.72 ? 'warn' : 'ng';
+}
+function diffHtml(entry, ocrLine) {
+    const a = normalize(entry), b = normalize(ocrLine);
+    let out = '';
+    const n = Math.max(a.length, b.length);
+    for (let i = 0; i < n; i++) {
+        const ca = a[i] || '＿', cb = b[i];
+        if (cb === undefined) out += '<span class="diff-bad">' + esc(ca) + '</span>';
+        else if (ca === cb) out += esc(cb);
+        else out += '<span class="diff-bad">' + esc(cb) + '</span>';
+    }
+    return out;
+}
 
 /* ============ OCR ============ */
 let ocrWorker = null, ocrReady = false, ocrFailed = false;
-function setOcrStatus(t) { document.getElementById('ocr-status').textContent = t || ''; }
 async function ensureOcr() {
     if (ocrReady) return true;
     if (ocrFailed) return false;
-    if (typeof Tesseract === 'undefined') { ocrFailed = true; setOcrStatus('文字認識ライブラリを読み込めませんでした（通信環境を確認してください）'); return false; }
+    if (typeof Tesseract === 'undefined') { ocrFailed = true; return false; }
     try {
-        setOcrStatus('文字認識の準備中…（初回は辞書のダウンロードで1分ほどかかることがあります）');
-        ocrWorker = await Tesseract.createWorker('jpn', 1, {
-            logger: m => { if (m.status === 'loading tesseract core' || String(m.status).includes('traineddata')) setOcrStatus('辞書をダウンロード中… ' + Math.round((m.progress || 0) * 100) + '%'); }
-        });
-        ocrReady = true; setOcrStatus('');
-        return true;
-    } catch (e) {
-        try { await Tesseract.recognize(document.createElement('canvas'), 'jpn'); ocrReady = true; return true; }
-        catch (e2) { ocrFailed = true; setOcrStatus('文字認識を開始できませんでした'); return false; }
-    }
+        ocrWorker = await Tesseract.createWorker('jpn');
+        ocrReady = true; return true;
+    } catch (e) { ocrReady = true; ocrWorker = null; return true; }
 }
-function preprocessToCanvas(source, sx, sy, sw, sh) {
+function preprocess(source, sx, sy, sw, sh, targetW) {
     const cv = document.getElementById('work-canvas');
-    const targetW = 1000;
-    const scale = Math.min(2, targetW / sw);
+    const scale = Math.min(2, (targetW || 1000) / sw);
     cv.width = Math.max(50, Math.round(sw * scale));
     cv.height = Math.max(50, Math.round(sh * scale));
     const ctx = cv.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(source, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
     const img = ctx.getImageData(0, 0, cv.width, cv.height);
-    const d = img.data, gray = new Float32Array(cv.width * cv.height);
+    const d = img.data, n = cv.width * cv.height, gray = new Float32Array(n);
     let mn = 255, mx = 0;
-    for (let i = 0; i < gray.length; i++) {
+    for (let i = 0; i < n; i++) {
         gray[i] = d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114;
         if (gray[i] < mn) mn = gray[i]; if (gray[i] > mx) mx = gray[i];
     }
-    const stretch = mx - mn > 10 ? 255 / (mx - mn) : 1;
-    for (let i = 0; i < gray.length; i++) {
-        const v = Math.max(0, Math.min(255, (gray[i] - mn) * stretch));
+    const st = mx - mn > 10 ? 255 / (mx - mn) : 1;
+    for (let i = 0; i < n; i++) {
+        const v = Math.max(0, Math.min(255, (gray[i] - mn) * st));
         d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255;
     }
     ctx.putImageData(img, 0, 0);
     return cv;
+}
+function cloneCanvas(src) {
+    const c = document.createElement('canvas');
+    c.width = src.width; c.height = src.height;
+    c.getContext('2d').drawImage(src, 0, 0);
+    return c;
 }
 async function ocrCanvas(canvas) {
     if (window.__ocrStub) return window.__ocrStub(canvas);
@@ -248,228 +479,264 @@ async function ocrCanvas(canvas) {
         return r.data;
     } catch (e) { return null; }
 }
-
-/* ============ 原稿の登録 ============ */
-document.getElementById('btn-ms-file').addEventListener('click', () => document.getElementById('file-ms').click());
-document.getElementById('file-ms').addEventListener('change', e => {
-    const f = e.target.files[0]; e.target.value = '';
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = () => { document.getElementById('ms-text').value = String(r.result || '').replace(/\r\n/g, '\n'); };
-    r.readAsText(f);
-});
-document.getElementById('btn-ms-photo').addEventListener('click', () => document.getElementById('file-ms-photo').click());
-document.getElementById('file-ms-photo').addEventListener('change', async e => {
-    const f = e.target.files[0]; e.target.value = '';
-    if (!f) return;
-    setOcrStatus('原稿写真を読み取り中…');
-    const img = new Image();
-    img.onload = async () => {
-        const cv = preprocessToCanvas(img, 0, 0, img.width, img.height);
-        URL.revokeObjectURL(img.src);
-        const data = await ocrCanvas(cv);
-        setOcrStatus('');
-        if (!data) { alert('読み取れませんでした。明るい場所で撮り直してください。'); return; }
-        const lines = (data.lines && data.lines.length ? data.lines.map(l => l.text) : String(data.text || '').split(/\n/))
-            .map(l => l.trim()).filter(l => normalize(l).length >= 2);
-        document.getElementById('ms-text').value = lines.join('\n');
-        if (!document.getElementById('ms-name').value) document.getElementById('ms-name').value = '写真から読み込んだ原稿';
-    };
-    img.src = URL.createObjectURL(f);
-});
-document.getElementById('btn-ms-add').addEventListener('click', () => {
-    const entries = document.getElementById('ms-text').value.split(/\n/).map(l => l.trim()).filter(l => l.length);
-    if (!entries.length) { alert('原稿の内容が空です'); return; }
-    const name = document.getElementById('ms-name').value.trim() || ('原稿' + (S.manuscripts.length + 1));
-    S.manuscripts.push({ id: uid(), name, entries });
-    document.getElementById('ms-text').value = '';
-    document.getElementById('ms-name').value = '';
-    saveState(); renderManuscripts(); renderProgress();
-});
-
-/* ============ 原稿リスト・進捗 ============ */
-function renderManuscripts() {
-    const box = document.getElementById('ms-list');
-    box.innerHTML = '';
-    if (!S.manuscripts.length) return;
-    const card = document.createElement('div'); card.className = 'card';
-    card.innerHTML = '<p class="cat-title">登録済みの原稿</p>';
-    for (const ms of S.manuscripts) {
-        const done = ms.entries.filter((_, i) => S.checked[entryUid(ms, i)]).length;
-        const div = document.createElement('div'); div.className = 'ms-item';
-        div.innerHTML = '<div class="row-flex"><span class="nm" style="flex:1;">' + esc(ms.name) + '</span>' +
-            '<span style="font-weight:bold; color:#2563eb;">' + done + '/' + ms.entries.length + ' 済</span></div>' +
-            '<div class="prog"><div style="width:' + (ms.entries.length ? done / ms.entries.length * 100 : 0) + '%"></div></div>';
-        const del = document.createElement('button');
-        del.type = 'button'; del.className = 'btn-danger'; del.textContent = 'この原稿を削除';
-        del.style.marginTop = '8px';
-        del.addEventListener('click', () => {
-            if (!confirm('原稿「' + ms.name + '」と、その確認記録を削除します。')) return;
-            S.manuscripts = S.manuscripts.filter(x => x.id !== ms.id);
-            for (const k of Object.keys(S.checked)) if (k.startsWith(ms.id + ':')) delete S.checked[k];
-            saveState(); renderManuscripts(); renderProgress();
-        });
-        div.appendChild(del); card.appendChild(div);
-    }
-    box.appendChild(card);
+async function ocrImageFile(f) {
+    const url = URL.createObjectURL(f);
+    try {
+        const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+        const cv = cloneCanvas(preprocess(img, 0, 0, img.width, img.height, 1200));
+        return await ocrCanvas(cv);
+    } finally { URL.revokeObjectURL(url); }
 }
-function renderProgress() {
-    const box = document.getElementById('progress-box');
-    if (!S.manuscripts.length) { box.innerHTML = '<p class="note">原稿を登録すると、札ごとの確認状況がここに出ます</p>'; return; }
-    box.innerHTML = '';
-    for (const ms of S.manuscripts) {
-        const done = ms.entries.filter((_, i) => S.checked[entryUid(ms, i)]).length;
-        const head = document.createElement('p');
-        head.innerHTML = '<b>' + esc(ms.name) + '</b>： ' + done + '/' + ms.entries.length + ' 済' + (done === ms.entries.length ? '　🎉 全部確認できました' : '');
-        box.appendChild(head);
-        const chips = document.createElement('div');
-        ms.entries.forEach((entry, i) => {
-            const c = document.createElement('span');
-            c.className = 'entry-chip' + (S.checked[entryUid(ms, i)] ? ' done' : '');
-            c.textContent = (i + 1) + '. ' + entry;
-            chips.appendChild(c);
-        });
-        box.appendChild(chips);
-    }
-}
-function renderLog() {
-    const box = document.getElementById('log-box');
-    if (!S.log.length) { box.innerHTML = '<p class="note">まだチェックしていません</p>'; return; }
-    box.innerHTML = S.log.map(l => '<div class="log-item">' + esc(l.time) + '　' + esc(l.text) + '</div>').join('');
-}
-function addLog(text) {
-    const now = new Date();
-    const hh = String(now.getHours()).padStart(2, '0'), mm = String(now.getMinutes()).padStart(2, '0');
-    S.log.unshift({ time: hh + ':' + mm, text });
-    S.log = S.log.slice(0, 30);
-    saveState(); renderLog();
-}
-
-/* ============ 結果表示 ============ */
-let pendingMark = null;
-function diffHtml(entry, ocrLine) {
-    const a = normalize(entry), b = normalize(ocrLine);
-    let out = '';
-    const n = Math.max(a.length, b.length);
-    for (let i = 0; i < n; i++) {
-        const ca = a[i] || '＿', cb = b[i];
-        if (cb === undefined) out += '<span class="diff-bad">' + esc(ca) + '</span>';
-        else if (ca === cb) out += '<span class="diff-ok">' + esc(cb) + '</span>';
-        else out += '<span class="diff-bad">' + esc(cb) + '</span>';
+async function pdfToCanvases(f) {
+    if (typeof pdfjsLib === 'undefined') throw new Error('pdf lib not loaded');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    const buf = await f.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const out = [];
+    const pages = Math.min(pdf.numPages, 8);
+    for (let p = 1; p <= pages; p++) {
+        const page = await pdf.getPage(p);
+        const vp = page.getViewport({ scale: 2 });
+        const c = document.createElement('canvas');
+        c.width = vp.width; c.height = vp.height;
+        await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+        out.push(cloneCanvas(preprocess(c, 0, 0, c.width, c.height, 1200)));
     }
     return out;
 }
-function showResult(best, rawText) {
-    const verdict = document.getElementById('result-verdict');
-    const where = document.getElementById('result-where');
-    const diff = document.getElementById('result-diff');
-    const markBtn = document.getElementById('btn-mark-ok');
-    pendingMark = null; markBtn.classList.add('hidden');
-    if (!S.manuscripts.length) {
-        verdict.className = ''; verdict.textContent = '先に原稿を登録してください';
-        where.textContent = ''; diff.innerHTML = ''; return;
-    }
-    if (!best || best.sim < 0.45) {
-        verdict.className = ''; verdict.classList.add('ng');
-        verdict.textContent = '✗ 原稿に一致する札が見つかりません';
-        where.textContent = '';
-        diff.innerHTML = '読み取り：' + esc(String(rawText || '').replace(/\n/g, ' ').trim() || '（読み取れず）');
-        return;
-    }
-    const whereText = '原稿「' + best.ms.name + '」の ' + (best.idx + 1) + '番目';
-    if (normalize(best.entry) === normalize(best.ocrLine)) {
-        verdict.className = ''; verdict.classList.add('ok');
-        verdict.textContent = '✓ 一致しました';
-        where.textContent = whereText;
-        diff.innerHTML = esc(best.entry);
-        const key = entryUid(best.ms, best.idx);
-        if (!S.checked[key]) {
-            S.checked[key] = Date.now(); saveState();
-            addLog('✓ ' + whereText + '：' + best.entry);
-            renderManuscripts(); renderProgress();
-        }
-    } else if (best.sim >= 0.72) {
-        verdict.className = ''; verdict.classList.add('warn');
-        verdict.textContent = '⚠ 要確認（違いがあります）';
-        where.textContent = whereText + ' の札だと思います';
-        diff.innerHTML = '原稿：' + esc(best.entry) + '<br>札　：' + diffHtml(best.entry, best.ocrLine);
-        pendingMark = { ms: best.ms, idx: best.idx, entry: best.entry, whereText };
-        markBtn.classList.remove('hidden');
-    } else {
-        verdict.className = ''; verdict.classList.add('ng');
-        verdict.textContent = '✗ 一致する札がありません（近い候補もなし）';
-        where.textContent = '';
-        diff.innerHTML = '読み取り：' + esc(String(rawText || '').replace(/\n/g, ' ').trim() || '（読み取れず）');
-    }
+
+/* ============ STEP3：札チェック ============ */
+function goStep3() {
+    const cs = activeCase(); if (!cs) return;
+    document.getElementById('step3-case').textContent = '案件：' + cs.name;
+    renderTags(); showView('view-step3');
 }
-document.getElementById('btn-mark-ok').addEventListener('click', () => {
-    if (!pendingMark) return;
-    S.checked[entryUid(pendingMark.ms, pendingMark.idx)] = Date.now();
-    addLog('✓（目視確認） ' + pendingMark.whereText + '：' + pendingMark.entry);
-    saveState(); renderManuscripts(); renderProgress();
-    document.getElementById('btn-mark-ok').classList.add('hidden');
-    const verdict = document.getElementById('result-verdict');
-    verdict.className = ''; verdict.classList.add('ok');
-    verdict.textContent = '✓ 確認済みにしました';
-    pendingMark = null;
+function tagMark(t) {
+    if (t.verdict === 'ok' || t.confirmed) return { ch: '○', cls: 'ok' };
+    if (t.verdict === 'warn') return { ch: '△', cls: 'warn' };
+    return { ch: '✕', cls: 'ng' };
+}
+function renderTags() {
+    const cs = activeCase(); if (!cs) return;
+    const p = caseProgress(cs);
+    document.getElementById('step3-progress').textContent = 'チェック済み ' + p.passed + ' / ' + p.total + ' 枚' + (p.total && p.passed === p.total ? '　🎉 全部そろいました' : '');
+    document.getElementById('step3-progbar').style.width = (p.total ? p.passed / p.total * 100 : 0) + '%';
+    const box = document.getElementById('tag-list');
+    box.innerHTML = '';
+    if (!cs.tags.length) box.innerHTML = '<p class="note">まだ札をチェックしていません</p>';
+    for (const t of cs.tags) {
+        const m = tagMark(t);
+        const div = document.createElement('div'); div.className = 'tag-item';
+        div.innerHTML = (t.thumb ? '<img src="' + t.thumb + '" alt="">' : '') +
+            '<span class="mark ' + m.cls + '">' + m.ch + '</span>' +
+            '<span class="tx"><b>' + esc(t.entry || t.ocrText || '（読み取れず）') + '</b><br>' +
+            (t.srcLabel ? '原稿「' + esc(t.srcLabel) + '」の ' + (t.idx + 1) + '番目' : '原稿に候補がありません') +
+            (t.verdict === 'warn' && !t.confirmed ? '　※要確認' : '') + '</span>';
+        div.addEventListener('click', () => openTagModal(t.id));
+        box.appendChild(div);
+    }
+    const passed = passedKeys(cs);
+    const rest = allEntries(cs).filter(({ src, idx }) => !passed.has(src.id + ':' + idx));
+    const ub = document.getElementById('unchecked-box');
+    if (rest.length) {
+        ub.innerHTML = '<p class="lbl">まだ確認できていない札（' + rest.length + '枚）</p>' +
+            rest.map(({ src, idx, entry }) => '<span class="entry-chip">' + esc(src.label) + ' ' + (idx + 1) + '. ' + esc(entry) + '</span>').join('');
+    } else ub.innerHTML = '';
+}
+function makeThumb(canvas) {
+    const c = document.createElement('canvas');
+    const scale = Math.min(1, 420 / canvas.width);
+    c.width = Math.round(canvas.width * scale); c.height = Math.round(canvas.height * scale);
+    c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.72);
+}
+async function addTagFromCanvas(rawCanvas, thumbCanvas) {
+    const cs = activeCase(); if (!cs) return null;
+    const data = await ocrCanvas(rawCanvas);
+    const ocrText = data ? String(data.text || '') : '';
+    const best = ocrText ? matchTag(cs, ocrText) : null;
+    const verdict = best ? judgeVerdict(best, best.ocrLine) : 'ng';
+    const hit = verdict !== 'ng' ? best : null;
+    const tag = {
+        id: uid(), thumb: thumbCanvas ? makeThumb(thumbCanvas) : '',
+        verdict, confirmed: false,
+        srcId: hit ? hit.src.id : null,
+        srcLabel: hit ? hit.src.label : '',
+        idx: hit ? hit.idx : -1,
+        entry: hit ? hit.entry : '',
+        ocrText: best ? best.ocrLine : ocrText.replace(/\n/g, ' '),
+        sim: best ? best.sim : 0, ts: Date.now()
+    };
+    cs.tags.unshift(tag); saveState(); renderTags();
+    return tag;
+}
+document.getElementById('btn-tag-file').addEventListener('click', () => document.getElementById('file-tag').click());
+document.getElementById('file-tag').addEventListener('change', async e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    try {
+        if (/pdf/i.test(f.type || '') || /\.pdf$/i.test(f.name)) {
+            const pages = await pdfToCanvases(f);
+            if (pages.length) await addTagFromCanvas(pages[0], pages[0]);
+        } else {
+            const url = URL.createObjectURL(f);
+            const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+            const cv = cloneCanvas(preprocess(img, 0, 0, img.width, img.height, 1000));
+            URL.revokeObjectURL(url);
+            await addTagFromCanvas(cv, cv);
+        }
+    } catch (err) { alert('札の読み込みに失敗しました'); }
 });
+document.getElementById('btn-step3-back').addEventListener('click', goStep2);
+document.getElementById('btn-step3-finish').addEventListener('click', () => { renderCases(); showView('view-cases'); });
+function openTagModal(tagId) {
+    const cs = activeCase(); if (!cs) return;
+    const t = cs.tags.find(x => x.id === tagId); if (!t) return;
+    const m = tagMark(t);
+    const card = document.getElementById('modal-card');
+    card.innerHTML =
+        '<p class="cat-title">チェック結果</p>' +
+        (t.thumb ? '<img class="big" src="' + t.thumb + '" alt="">' : '') +
+        '<p style="font-size:22px; font-weight:bold; margin:12px 0 2px;" class="' + '' + '">' +
+        (m.cls === 'ok' ? '<span style="color:#15803d;">○ 一致しました</span>' : m.cls === 'warn' ? '<span style="color:#b45309;">△ 要確認（違いがあります）</span>' : '<span style="color:#b91c1c;">✕ 原稿に一致する札がありません</span>') + '</p>' +
+        (t.srcLabel ? '<p style="font-weight:bold; color:#2563eb; margin:0 0 6px;">原稿「' + esc(t.srcLabel) + '」の ' + (t.idx + 1) + '番目</p>' : '') +
+        (t.entry ? '<p style="font-size:16px; line-height:1.6; margin:0 0 4px;">原稿：' + esc(t.entry) + '<br>札　：' + diffHtml(t.entry, t.ocrText) + '</p>' : '<p style="font-size:16px;">読み取り：' + esc(t.ocrText || '（読み取れず）') + '</p>') +
+        '<p class="note">似ている度合い：' + Math.round((t.sim || 0) * 100) + '%</p>';
+    if (t.verdict === 'warn' && !t.confirmed) {
+        const ok = document.createElement('button');
+        ok.type = 'button'; ok.className = 'btn-primary'; ok.textContent = '目で見て正しいので、この札でOKにする';
+        ok.addEventListener('click', () => { t.confirmed = true; saveState(); renderTags(); closeModal(); });
+        card.appendChild(ok);
+    }
+    const del = document.createElement('button');
+    del.type = 'button'; del.className = 'btn-danger'; del.textContent = 'この結果を削除'; del.style.width = '100%'; del.style.marginTop = '8px'; del.style.padding = '10px';
+    del.addEventListener('click', () => { cs.tags = cs.tags.filter(x => x.id !== t.id); saveState(); renderTags(); closeModal(); });
+    card.appendChild(del);
+    const close = document.createElement('button');
+    close.type = 'button'; close.className = 'btn-primary'; close.textContent = '閉じる'; close.style.marginTop = '8px';
+    close.addEventListener('click', closeModal);
+    card.appendChild(close);
+    document.getElementById('modal-bg').classList.remove('hidden');
+}
 
 /* ============ カメラ ============ */
 const video = document.getElementById('cam-video');
-let camStream = null, camTimer = null, ocrBusy = false, lastResultSig = '';
-async function checkCanvas(canvas, rawFallback) {
-    const data = await ocrCanvas(canvas);
-    if (!data) { showResult(null, ''); return; }
-    const best = matchTag(data.text || '');
-    showResult(best, data.text || '');
-}
-async function captureAndCheck() {
-    if (ocrBusy || !camStream || !video.videoWidth) return;
-    ocrBusy = true;
-    try {
-        const vw = video.videoWidth, vh = video.videoHeight;
-        const cv = preprocessToCanvas(video, vw * 0.06, vh * 0.26, vw * 0.88, vh * 0.44);
-        await checkCanvas(cv);
-    } finally { ocrBusy = false; }
-}
-document.getElementById('btn-cam-start').addEventListener('click', async () => {
-    const btn = document.getElementById('btn-cam-start');
-    if (camStream) {
-        camStream.getTracks().forEach(t => t.stop()); camStream = null;
-        clearInterval(camTimer); camTimer = null;
-        btn.textContent = '📹 カメラ開始';
-        document.getElementById('btn-cam-shot').classList.add('hidden');
-        return;
-    }
+let camStream = null, camTimer = null, camMode = 'ms', returnView = 'view-step2', ocrBusy = false;
+let liveState = null, lastAutoSig = '';
+function setCamStatus(t) { document.getElementById('cam-status').textContent = t || ''; }
+async function openCamera(mode) {
+    camMode = mode;
+    returnView = mode === 'ms' ? 'view-step2' : 'view-step3';
+    document.getElementById('cam-title').textContent = mode === 'ms' ? '原稿を撮影' : mode === 'live' ? 'リアルタイム判別中' : '札を撮影';
+    document.getElementById('guide-label').textContent = mode === 'ms' ? '原稿全体を収めてください' : '札をこの枠に入れてください（1枚だけ）';
+    document.getElementById('btn-shutter').classList.toggle('hidden', mode === 'live');
+    document.getElementById('live-result').classList.toggle('hidden', mode !== 'live');
+    document.getElementById('guide-frame').style.top = mode === 'ms' ? '8%' : '26%';
+    document.getElementById('guide-frame').style.height = mode === 'ms' ? '80%' : '44%';
+    showView('view-camera');
     try {
         camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+        video.srcObject = camStream;
     } catch (e) {
         alert('カメラを使えませんでした。ブラウザのカメラ許可を確認してください。');
+        showView(returnView); return;
+    }
+    ensureOcr();
+    if (mode === 'live') { liveState = null; lastAutoSig = ''; camTimer = setInterval(liveTick, 1700); }
+}
+function closeCamera() {
+    if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+    if (camTimer) { clearInterval(camTimer); camTimer = null; }
+    showView(returnView);
+}
+document.getElementById('btn-cam-close').addEventListener('click', closeCamera);
+document.getElementById('btn-tag-camera').addEventListener('click', () => openCamera('shot'));
+document.getElementById('btn-tag-live').addEventListener('click', () => openCamera('live'));
+function grabFrame(cropGuide) {
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw) return null;
+    if (cropGuide && camMode !== 'ms') return cloneCanvas(preprocess(video, vw * 0.06, vh * 0.26, vw * 0.88, vh * 0.44, 1000));
+    return cloneCanvas(preprocess(video, 0, 0, vw, vh, 1200));
+}
+document.getElementById('btn-shutter').addEventListener('click', async () => {
+    if (ocrBusy) return;
+    const frame = grabFrame(true);
+    if (!frame) return;
+    ocrBusy = true; setCamStatus('読み取り中…');
+    try {
+        if (camMode === 'ms') {
+            const data = await ocrCanvas(frame);
+            setCamStatus('');
+            if (!data) { alert('読み取れませんでした。明るく撮り直してください。'); return; }
+            const cs = activeCase();
+            const n = cs ? cs.sources.filter(s => s.kind === 'photo').length + 1 : 1;
+            addSource('撮影した原稿' + (n > 1 ? '（' + n + '）' : ''), 'photo', extractLines(data));
+            closeCamera();
+        } else {
+            await addTagFromCanvas(frame, frame);
+            setCamStatus('');
+            closeCamera();
+        }
+    } finally { ocrBusy = false; }
+});
+async function liveTick() {
+    if (ocrBusy || !camStream || !video.videoWidth) return;
+    const cs = activeCase(); if (!cs) return;
+    ocrBusy = true;
+    try {
+        const frame = grabFrame(true);
+        if (!frame) return;
+        const data = await ocrCanvas(frame);
+        if (!data) return;
+        const ocrText = String(data.text || '');
+        const best = matchTag(cs, ocrText);
+        renderLive(best, ocrText);
+        // 完全一致は自動で記録（同じ札の二重記録はしない）
+        if (best && judgeVerdict(best, best.ocrLine) === 'ok') {
+            const sig = best.src.id + ':' + best.idx;
+            const passed = passedKeys(cs);
+            if (!passed.has(sig) && sig !== lastAutoSig) {
+                lastAutoSig = sig;
+                await addTagFromCanvas(frame, frame);
+                setCamStatus('記録しました：原稿「' + best.src.label + '」の ' + (best.idx + 1) + '番目');
+            }
+        }
+    } finally { ocrBusy = false; }
+}
+function renderLive(best, rawText) {
+    const v = document.getElementById('live-verdict');
+    const w = document.getElementById('live-where');
+    const d = document.getElementById('live-diff');
+    const rec = document.getElementById('btn-live-record');
+    liveState = null; rec.classList.add('hidden');
+    if (!best || best.sim < 0.45) {
+        v.className = 'ng'; v.textContent = '✗ 原稿に一致する札が見つかりません';
+        w.textContent = ''; d.innerHTML = '読み取り：' + esc(String(rawText || '').replace(/\n/g, ' ').trim() || '（読み取れず）');
         return;
     }
-    video.srcObject = camStream;
-    btn.textContent = '⏹ カメラ停止';
-    document.getElementById('btn-cam-shot').classList.remove('hidden');
-    ensureOcr();
-    camTimer = setInterval(captureAndCheck, 1700);
-});
-document.getElementById('btn-cam-shot').addEventListener('click', captureAndCheck);
-document.getElementById('btn-photo-check').addEventListener('click', () => document.getElementById('file-tag-photo').click());
-document.getElementById('file-tag-photo').addEventListener('change', e => {
-    const f = e.target.files[0]; e.target.value = '';
-    if (!f) return;
-    const img = new Image();
-    img.onload = async () => {
-        const cv = preprocessToCanvas(img, 0, 0, img.width, img.height);
-        URL.revokeObjectURL(img.src);
-        await checkCanvas(cv);
-        document.getElementById('result-bar').scrollIntoView({ behavior: 'smooth', block: 'end' });
-    };
-    img.src = URL.createObjectURL(f);
+    const verdict = judgeVerdict(best, best.ocrLine);
+    const whereText = '原稿「' + best.src.label + '」の ' + (best.idx + 1) + '番目';
+    if (verdict === 'ok') {
+        v.className = 'ok'; v.textContent = '○ 一致しました';
+        w.textContent = whereText; d.innerHTML = esc(best.entry);
+    } else if (verdict === 'warn') {
+        v.className = 'warn'; v.textContent = '△ 要確認（違いがあります）';
+        w.textContent = whereText + ' の札だと思います';
+        d.innerHTML = '原稿：' + esc(best.entry) + '<br>札　：' + diffHtml(best.entry, best.ocrLine);
+        liveState = { best }; rec.classList.remove('hidden');
+    } else {
+        v.className = 'ng'; v.textContent = '✗ 一致する札がありません';
+        w.textContent = ''; d.innerHTML = '読み取り：' + esc(String(rawText || '').replace(/\n/g, ' ').trim());
+    }
+}
+document.getElementById('btn-live-record').addEventListener('click', async () => {
+    const frame = grabFrame(true);
+    if (frame) { await addTagFromCanvas(frame, frame); setCamStatus('記録しました'); document.getElementById('btn-live-record').classList.add('hidden'); }
 });
 
 /* ============ 初期化 ============ */
-renderManuscripts(); renderProgress(); renderLog();
+renderCases();
+showView('view-cases');
 </script>
 </body>
 </html>
