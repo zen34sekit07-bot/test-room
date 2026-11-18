@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>名札チェック（試作）</title>
+<meta name="theme-color" content="#f4f4f2">
+<style>
+    * { box-sizing: border-box; }
+    body {
+        margin: 0; background-color: #eeeeec; color: #262626;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+        font-size: 15px;
+    }
+    .hidden { display: none !important; }
+    .topbar {
+        display: flex; align-items: center; gap: 10px; background: #f4f4f2;
+        padding: max(env(safe-area-inset-top, 8px), 8px) 12px 8px; border-bottom: 2px solid #d9d9d7;
+        position: sticky; top: 0; z-index: 30;
+    }
+    .topbar a { color: #2563eb; font-weight: bold; font-size: 14px; text-decoration: none; white-space: nowrap; }
+    .topbar h1 { font-size: 18px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .wrap { max-width: 560px; margin: 0 auto; padding: 12px 12px 190px; display: flex; flex-direction: column; gap: 12px; }
+    .card { background: #ffffff; border: 2px solid #d9d9d7; border-radius: 14px; padding: 12px; }
+    .cat-title { font-size: 16px; font-weight: bold; border-left: 5px solid #2563eb; padding-left: 8px; margin: 0 0 8px; }
+    .lbl { font-size: 14px; font-weight: bold; display: block; margin-bottom: 4px; }
+    .inp {
+        background: #f4f4f2; border: 2px solid #c6c6c4; color: #262626; border-radius: 10px;
+        padding: 10px 12px; font-size: 16px; width: 100%; min-width: 0;
+    }
+    .inp:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.3); }
+    .btn-primary { background: #2563eb; color: #fff; font-weight: bold; font-size: 16px; padding: 12px 14px; border-radius: 12px; border: 2px solid #2563eb; width: 100%; }
+    .btn-primary:active { transform: scale(.98); }
+    .btn-sub { background: #fff; color: #262626; font-weight: bold; font-size: 15px; padding: 10px 14px; border-radius: 12px; border: 2px solid #c6c6c4; white-space: nowrap; }
+    .btn-sub:active { transform: scale(.98); }
+    .btn-danger { background: #fff; color: #b91c1c; font-weight: bold; font-size: 14px; padding: 8px 10px; border-radius: 10px; border: 2px solid #e5a3a3; white-space: nowrap; }
+    .row-flex { display: flex; gap: 8px; align-items: center; }
+    .note { font-size: 13px; color: #6f6f6f; line-height: 1.5; }
+    .ms-item { border: 2px solid #d9d9d7; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; background: #fff; }
+    .ms-item .nm { font-size: 16px; font-weight: bold; word-break: break-all; }
+    .prog { height: 12px; background: #e4e4e2; border-radius: 999px; margin-top: 6px; overflow: hidden; }
+    .prog > div { height: 12px; background: #2563eb; border-radius: 999px; transition: width .25s; }
+    #video-box { position: relative; background: #171717; border-radius: 14px; overflow: hidden; }
+    #cam-video { width: 100%; display: block; aspect-ratio: 4/3; object-fit: cover; background: #171717; }
+    #guide-frame {
+        position: absolute; left: 6%; right: 6%; top: 26%; height: 44%;
+        border: 3px solid rgba(37,99,235,.95); border-radius: 10px; pointer-events: none;
+        box-shadow: 0 0 0 999px rgba(0,0,0,.28);
+    }
+    #guide-label {
+        position: absolute; left: 6%; top: calc(26% - 30px); color: #fff; font-size: 13px; font-weight: bold;
+        background: rgba(37,99,235,.9); padding: 3px 8px; border-radius: 6px; pointer-events: none;
+    }
+    #result-bar {
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+        background: #ffffff; border-top: 3px solid #d9d9d7;
+        padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+        box-shadow: 0 -4px 18px rgba(0,0,0,.12);
+    }
+    #result-bar .inner { max-width: 560px; margin: 0 auto; }
+    #result-verdict { font-size: 19px; font-weight: bold; line-height: 1.3; }
+    #result-verdict.ok { color: #15803d; }
+    #result-verdict.warn { color: #b45309; }
+    #result-verdict.ng { color: #b91c1c; }
+    #result-where { font-size: 14px; font-weight: bold; color: #2563eb; margin-top: 2px; }
+    #result-diff { font-size: 16px; line-height: 1.6; margin-top: 4px; word-break: break-all; }
+    .diff-bad { color: #b91c1c; font-weight: bold; background: #fee2e2; border-radius: 4px; padding: 0 2px; }
+    .diff-ok { color: #262626; }
+    .log-item { font-size: 14px; border-bottom: 1px solid #e4e4e2; padding: 6px 0; line-height: 1.5; word-break: break-all; }
+    .entry-chip { display: inline-block; background: #f4f4f2; border: 1px solid #d9d9d7; border-radius: 8px; padding: 4px 8px; font-size: 14px; margin: 0 6px 6px 0; word-break: break-all; }
+    .entry-chip.done { background: #dbeafe; border-color: #2563eb; color: #1d4ed8; font-weight: bold; }
+</style>
+</head>
+<body>
+    <div class="topbar">
+        <a href="index.html">← テストルームへ</a>
+        <h1>名札チェック（試作）</h1>
+    </div>
+
+    <div class="wrap">
+        <!-- 原稿 -->
+        <div class="card">
+            <p class="cat-title">① 原稿を用意する</p>
+            <label class="lbl" for="ms-name">原稿の名前</label>
+            <input id="ms-name" class="inp" type="text" placeholder="例：○○家 供花名札リスト">
+            <label class="lbl" for="ms-text" style="margin-top:10px;">原稿の内容（1行＝札1枚分）</label>
+            <textarea id="ms-text" class="inp" rows="6" placeholder="1行に1枚分の文字をそのまま入れてください。ファイルや写真から読み込むと、ここに反映されます。間違いに気づいたら登録前に直せます。"></textarea>
+            <div class="row-flex" style="margin-top:10px;">
+                <button id="btn-ms-file" class="btn-sub" type="button" style="flex:1;">📄 ファイルから</button>
+                <button id="btn-ms-photo" class="btn-sub" type="button" style="flex:1;">📷 写真から</button>
+            </div>
+            <button id="btn-ms-add" class="btn-primary" type="button" style="margin-top:10px;">この内容で原稿を登録</button>
+            <p class="note" style="margin-top:8px;">写真からの読み取りは完璧ではありません。原稿が「正解」になるので、登録前に必ず目で確認して直してください。初回は文字認識の辞書ダウンロードで少し時間がかかります。</p>
+            <p id="ocr-status" class="note" style="color:#2563eb; font-weight:bold; min-height:18px;"></p>
+        </div>
+
+        <div id="ms-list"></div>
+
+        <!-- カメラチェック -->
+        <div class="card">
+            <p class="cat-title">② 札をカメラでチェック</p>
+            <div id="video-box">
+                <video id="cam-video" playsinline muted autoplay></video>
+                <div id="guide-frame"></div>
+                <div id="guide-label">札をこの枠に入れる</div>
+            </div>
+            <div class="row-flex" style="margin-top:10px;">
+                <button id="btn-cam-start" class="btn-primary" type="button" style="flex:1;">📹 カメラ開始</button>
+                <button id="btn-cam-shot" class="btn-sub hidden" type="button" style="flex:1;">今すぐチェック</button>
+            </div>
+            <div class="row-flex" style="margin-top:8px;">
+                <button id="btn-photo-check" class="btn-sub" type="button" style="flex:1;">🖼 札の写真を選んでチェック</button>
+            </div>
+            <p class="note" style="margin-top:8px;">カメラを開始すると、枠の中の札を自動で繰り返し読み取って照合します。明るい場所で、札が大きく写るように近づけてください。</p>
+        </div>
+
+        <!-- 進み具合 -->
+        <div class="card">
+            <p class="cat-title">③ 確認の進み具合</p>
+            <div id="progress-box"></div>
+        </div>
+
+        <!-- 履歴 -->
+        <div class="card">
+            <p class="cat-title">チェック履歴</p>
+            <div id="log-box"><p class="note">まだチェックしていません</p></div>
+        </div>
+    </div>
+
+    <!-- 結果バー（画面下に固定） -->
+    <div id="result-bar">
+        <div class="inner">
+            <div id="result-verdict">札をカメラに写すか、写真を選んでください</div>
+            <div id="result-where"></div>
+            <div id="result-diff"></div>
+            <button id="btn-mark-ok" class="btn-primary hidden" type="button" style="margin-top:8px; padding:10px;">この札でOK（確認済みにする）</button>
+        </div>
+    </div>
+
+    <input type="file" id="file-ms" accept=".txt,.csv,text/plain,text/csv" class="hidden">
+    <input type="file" id="file-ms-photo" accept="image/*" class="hidden">
+    <input type="file" id="file-tag-photo" accept="image/*" class="hidden">
+    <canvas id="work-canvas" class="hidden"></canvas>
+
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
+<script>
+'use strict';
+/* ============ 状態 ============ */
+const LS_KEY = 'tool8_nametag_v1';
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function loadState() {
+    try {
+        const d = JSON.parse(localStorage.getItem(LS_KEY));
+        if (d && Array.isArray(d.manuscripts)) { d.checked = d.checked || {}; d.log = d.log || []; return d; }
+    } catch (e) {}
+    return { manuscripts: [], checked: {}, log: [] };
+}
+let S = loadState();
+function saveState() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {} }
+
+/* ============ 照合ロジック ============ */
+const normalize = t => String(t || '').replace(/[\s　]/g, '').replace(/[、。，．・:：;；]$/g, '');
+function levenshtein(a, b) {
+    const m = a.length, n = b.length;
+    if (!m) return n; if (!n) return m;
+    let prev = Array.from({ length: n + 1 }, (_, j) => j);
+    for (let i = 1; i <= m; i++) {
+        const cur = [i];
+        for (let j = 1; j <= n; j++) {
+            cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+        }
+        prev = cur;
+    }
+    return prev[n];
+}
+const similarity = (a, b) => {
+    const x = normalize(a), y = normalize(b);
+    if (!x || !y) return 0;
+    return 1 - levenshtein(x, y) / Math.max(x.length, y.length);
+};
+function matchTag(ocrText) {
+    const lines = String(ocrText || '').split(/\n/).map(l => l.trim()).filter(l => normalize(l).length >= 2);
+    let best = null;
+    for (const ms of S.manuscripts) {
+        ms.entries.forEach((entry, idx) => {
+            for (const line of lines) {
+                const sim = similarity(line, entry);
+                if (!best || sim > best.sim) best = { ms, idx, entry, sim, ocrLine: line };
+            }
+            // 行が取れない場合に備え、全文とも照合
+            const simAll = similarity(ocrText, entry);
+            if (!best || simAll > best.sim) best = { ms, idx, entry, sim: simAll, ocrLine: String(ocrText || '').replace(/\n/g, ' ') };
+        });
+    }
+    return best;
+}
+const entryUid = (ms, idx) => ms.id + ':' + idx;
+
+/* ============ OCR ============ */
+let ocrWorker = null, ocrReady = false, ocrFailed = false;
+function setOcrStatus(t) { document.getElementById('ocr-status').textContent = t || ''; }
+async function ensureOcr() {
+    if (ocrReady) return true;
+    if (ocrFailed) return false;
+    if (typeof Tesseract === 'undefined') { ocrFailed = true; setOcrStatus('文字認識ライブラリを読み込めませんでした（通信環境を確認してください）'); return false; }
+    try {
+        setOcrStatus('文字認識の準備中…（初回は辞書のダウンロードで1分ほどかかることがあります）');
+        ocrWorker = await Tesseract.createWorker('jpn', 1, {
+            logger: m => { if (m.status === 'loading tesseract core' || String(m.status).includes('traineddata')) setOcrStatus('辞書をダウンロード中… ' + Math.round((m.progress || 0) * 100) + '%'); }
+        });
+        ocrReady = true; setOcrStatus('');
+        return true;
+    } catch (e) {
+        try { await Tesseract.recognize(document.createElement('canvas'), 'jpn'); ocrReady = true; return true; }
+        catch (e2) { ocrFailed = true; setOcrStatus('文字認識を開始できませんでした'); return false; }
+    }
+}
+function preprocessToCanvas(source, sx, sy, sw, sh) {
+    const cv = document.getElementById('work-canvas');
+    const targetW = 1000;
+    const scale = Math.min(2, targetW / sw);
+    cv.width = Math.max(50, Math.round(sw * scale));
+    cv.height = Math.max(50, Math.round(sh * scale));
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(source, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+    const img = ctx.getImageData(0, 0, cv.width, cv.height);
+    const d = img.data, gray = new Float32Array(cv.width * cv.height);
+    let mn = 255, mx = 0;
+    for (let i = 0; i < gray.length; i++) {
+        gray[i] = d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114;
+        if (gray[i] < mn) mn = gray[i]; if (gray[i] > mx) mx = gray[i];
+    }
+    const stretch = mx - mn > 10 ? 255 / (mx - mn) : 1;
+    for (let i = 0; i < gray.length; i++) {
+        const v = Math.max(0, Math.min(255, (gray[i] - mn) * stretch));
+        d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    return cv;
+}
+async function ocrCanvas(canvas) {
+    if (window.__ocrStub) return window.__ocrStub(canvas);
+    if (!await ensureOcr()) return null;
+    try {
+        if (ocrWorker) { const r = await ocrWorker.recognize(canvas); return r.data; }
+        const r = await Tesseract.recognize(canvas, 'jpn');
+        return r.data;
+    } catch (e) { return null; }
+}
+
+/* ============ 原稿の登録 ============ */
+document.getElementById('btn-ms-file').addEventListener('click', () => document.getElementById('file-ms').click());
+document.getElementById('file-ms').addEventListener('change', e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => { document.getElementById('ms-text').value = String(r.result || '').replace(/\r\n/g, '\n'); };
+    r.readAsText(f);
+});
+document.getElementById('btn-ms-photo').addEventListener('click', () => document.getElementById('file-ms-photo').click());
+document.getElementById('file-ms-photo').addEventListener('change', async e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    setOcrStatus('原稿写真を読み取り中…');
+    const img = new Image();
+    img.onload = async () => {
+        const cv = preprocessToCanvas(img, 0, 0, img.width, img.height);
+        URL.revokeObjectURL(img.src);
+        const data = await ocrCanvas(cv);
+        setOcrStatus('');
+        if (!data) { alert('読み取れませんでした。明るい場所で撮り直してください。'); return; }
+        const lines = (data.lines && data.lines.length ? data.lines.map(l => l.text) : String(data.text || '').split(/\n/))
+            .map(l => l.trim()).filter(l => normalize(l).length >= 2);
+        document.getElementById('ms-text').value = lines.join('\n');
+        if (!document.getElementById('ms-name').value) document.getElementById('ms-name').value = '写真から読み込んだ原稿';
+    };
+    img.src = URL.createObjectURL(f);
+});
+document.getElementById('btn-ms-add').addEventListener('click', () => {
+    const entries = document.getElementById('ms-text').value.split(/\n/).map(l => l.trim()).filter(l => l.length);
+    if (!entries.length) { alert('原稿の内容が空です'); return; }
+    const name = document.getElementById('ms-name').value.trim() || ('原稿' + (S.manuscripts.length + 1));
+    S.manuscripts.push({ id: uid(), name, entries });
+    document.getElementById('ms-text').value = '';
+    document.getElementById('ms-name').value = '';
+    saveState(); renderManuscripts(); renderProgress();
+});
+
+/* ============ 原稿リスト・進捗 ============ */
+function renderManuscripts() {
+    const box = document.getElementById('ms-list');
+    box.innerHTML = '';
+    if (!S.manuscripts.length) return;
+    const card = document.createElement('div'); card.className = 'card';
+    card.innerHTML = '<p class="cat-title">登録済みの原稿</p>';
+    for (const ms of S.manuscripts) {
+        const done = ms.entries.filter((_, i) => S.checked[entryUid(ms, i)]).length;
+        const div = document.createElement('div'); div.className = 'ms-item';
+        div.innerHTML = '<div class="row-flex"><span class="nm" style="flex:1;">' + esc(ms.name) + '</span>' +
+            '<span style="font-weight:bold; color:#2563eb;">' + done + '/' + ms.entries.length + ' 済</span></div>' +
+            '<div class="prog"><div style="width:' + (ms.entries.length ? done / ms.entries.length * 100 : 0) + '%"></div></div>';
+        const del = document.createElement('button');
+        del.type = 'button'; del.className = 'btn-danger'; del.textContent = 'この原稿を削除';
+        del.style.marginTop = '8px';
+        del.addEventListener('click', () => {
+            if (!confirm('原稿「' + ms.name + '」と、その確認記録を削除します。')) return;
+            S.manuscripts = S.manuscripts.filter(x => x.id !== ms.id);
+            for (const k of Object.keys(S.checked)) if (k.startsWith(ms.id + ':')) delete S.checked[k];
+            saveState(); renderManuscripts(); renderProgress();
+        });
+        div.appendChild(del); card.appendChild(div);
+    }
+    box.appendChild(card);
+}
+function renderProgress() {
+    const box = document.getElementById('progress-box');
+    if (!S.manuscripts.length) { box.innerHTML = '<p class="note">原稿を登録すると、札ごとの確認状況がここに出ます</p>'; return; }
+    box.innerHTML = '';
+    for (const ms of S.manuscripts) {
+        const done = ms.entries.filter((_, i) => S.checked[entryUid(ms, i)]).length;
+        const head = document.createElement('p');
+        head.innerHTML = '<b>' + esc(ms.name) + '</b>： ' + done + '/' + ms.entries.length + ' 済' + (done === ms.entries.length ? '　🎉 全部確認できました' : '');
+        box.appendChild(head);
+        const chips = document.createElement('div');
+        ms.entries.forEach((entry, i) => {
+            const c = document.createElement('span');
+            c.className = 'entry-chip' + (S.checked[entryUid(ms, i)] ? ' done' : '');
+            c.textContent = (i + 1) + '. ' + entry;
+            chips.appendChild(c);
+        });
+        box.appendChild(chips);
+    }
+}
+function renderLog() {
+    const box = document.getElementById('log-box');
+    if (!S.log.length) { box.innerHTML = '<p class="note">まだチェックしていません</p>'; return; }
+    box.innerHTML = S.log.map(l => '<div class="log-item">' + esc(l.time) + '　' + esc(l.text) + '</div>').join('');
+}
+function addLog(text) {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0'), mm = String(now.getMinutes()).padStart(2, '0');
+    S.log.unshift({ time: hh + ':' + mm, text });
+    S.log = S.log.slice(0, 30);
+    saveState(); renderLog();
+}
+
+/* ============ 結果表示 ============ */
+let pendingMark = null;
+function diffHtml(entry, ocrLine) {
+    const a = normalize(entry), b = normalize(ocrLine);
+    let out = '';
+    const n = Math.max(a.length, b.length);
+    for (let i = 0; i < n; i++) {
+        const ca = a[i] || '＿', cb = b[i];
+        if (cb === undefined) out += '<span class="diff-bad">' + esc(ca) + '</span>';
+        else if (ca === cb) out += '<span class="diff-ok">' + esc(cb) + '</span>';
+        else out += '<span class="diff-bad">' + esc(cb) + '</span>';
+    }
+    return out;
+}
+function showResult(best, rawText) {
+    const verdict = document.getElementById('result-verdict');
+    const where = document.getElementById('result-where');
+    const diff = document.getElementById('result-diff');
+    const markBtn = document.getElementById('btn-mark-ok');
+    pendingMark = null; markBtn.classList.add('hidden');
+    if (!S.manuscripts.length) {
+        verdict.className = ''; verdict.textContent = '先に原稿を登録してください';
+        where.textContent = ''; diff.innerHTML = ''; return;
+    }
+    if (!best || best.sim < 0.45) {
+        verdict.className = ''; verdict.classList.add('ng');
+        verdict.textContent = '✗ 原稿に一致する札が見つかりません';
+        where.textContent = '';
+        diff.innerHTML = '読み取り：' + esc(String(rawText || '').replace(/\n/g, ' ').trim() || '（読み取れず）');
+        return;
+    }
+    const whereText = '原稿「' + best.ms.name + '」の ' + (best.idx + 1) + '番目';
+    if (normalize(best.entry) === normalize(best.ocrLine)) {
+        verdict.className = ''; verdict.classList.add('ok');
+        verdict.textContent = '✓ 一致しました';
+        where.textContent = whereText;
+        diff.innerHTML = esc(best.entry);
+        const key = entryUid(best.ms, best.idx);
+        if (!S.checked[key]) {
+            S.checked[key] = Date.now(); saveState();
+            addLog('✓ ' + whereText + '：' + best.entry);
+            renderManuscripts(); renderProgress();
+        }
+    } else if (best.sim >= 0.72) {
+        verdict.className = ''; verdict.classList.add('warn');
+        verdict.textContent = '⚠ 要確認（違いがあります）';
+        where.textContent = whereText + ' の札だと思います';
+        diff.innerHTML = '原稿：' + esc(best.entry) + '<br>札　：' + diffHtml(best.entry, best.ocrLine);
+        pendingMark = { ms: best.ms, idx: best.idx, entry: best.entry, whereText };
+        markBtn.classList.remove('hidden');
+    } else {
+        verdict.className = ''; verdict.classList.add('ng');
+        verdict.textContent = '✗ 一致する札がありません（近い候補もなし）';
+        where.textContent = '';
+        diff.innerHTML = '読み取り：' + esc(String(rawText || '').replace(/\n/g, ' ').trim() || '（読み取れず）');
+    }
+}
+document.getElementById('btn-mark-ok').addEventListener('click', () => {
+    if (!pendingMark) return;
+    S.checked[entryUid(pendingMark.ms, pendingMark.idx)] = Date.now();
+    addLog('✓（目視確認） ' + pendingMark.whereText + '：' + pendingMark.entry);
+    saveState(); renderManuscripts(); renderProgress();
+    document.getElementById('btn-mark-ok').classList.add('hidden');
+    const verdict = document.getElementById('result-verdict');
+    verdict.className = ''; verdict.classList.add('ok');
+    verdict.textContent = '✓ 確認済みにしました';
+    pendingMark = null;
+});
+
+/* ============ カメラ ============ */
+const video = document.getElementById('cam-video');
+let camStream = null, camTimer = null, ocrBusy = false, lastResultSig = '';
+async function checkCanvas(canvas, rawFallback) {
+    const data = await ocrCanvas(canvas);
+    if (!data) { showResult(null, ''); return; }
+    const best = matchTag(data.text || '');
+    showResult(best, data.text || '');
+}
+async function captureAndCheck() {
+    if (ocrBusy || !camStream || !video.videoWidth) return;
+    ocrBusy = true;
+    try {
+        const vw = video.videoWidth, vh = video.videoHeight;
+        const cv = preprocessToCanvas(video, vw * 0.06, vh * 0.26, vw * 0.88, vh * 0.44);
+        await checkCanvas(cv);
+    } finally { ocrBusy = false; }
+}
+document.getElementById('btn-cam-start').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-cam-start');
+    if (camStream) {
+        camStream.getTracks().forEach(t => t.stop()); camStream = null;
+        clearInterval(camTimer); camTimer = null;
+        btn.textContent = '📹 カメラ開始';
+        document.getElementById('btn-cam-shot').classList.add('hidden');
+        return;
+    }
+    try {
+        camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    } catch (e) {
+        alert('カメラを使えませんでした。ブラウザのカメラ許可を確認してください。');
+        return;
+    }
+    video.srcObject = camStream;
+    btn.textContent = '⏹ カメラ停止';
+    document.getElementById('btn-cam-shot').classList.remove('hidden');
+    ensureOcr();
+    camTimer = setInterval(captureAndCheck, 1700);
+});
+document.getElementById('btn-cam-shot').addEventListener('click', captureAndCheck);
+document.getElementById('btn-photo-check').addEventListener('click', () => document.getElementById('file-tag-photo').click());
+document.getElementById('file-tag-photo').addEventListener('change', e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    const img = new Image();
+    img.onload = async () => {
+        const cv = preprocessToCanvas(img, 0, 0, img.width, img.height);
+        URL.revokeObjectURL(img.src);
+        await checkCanvas(cv);
+        document.getElementById('result-bar').scrollIntoView({ behavior: 'smooth', block: 'end' });
+    };
+    img.src = URL.createObjectURL(f);
+});
+
+/* ============ 初期化 ============ */
+renderManuscripts(); renderProgress(); renderLog();
+</script>
+</body>
+</html>
