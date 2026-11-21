@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>資材在庫管理（試作）</title>
+<link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="manifest" href="manifest.json">
 <style>
   * { box-sizing: border-box; }
@@ -77,6 +78,7 @@
   <button type="button" data-view="stock" class="active">在庫一覧</button>
   <button type="button" data-view="orders">発注管理</button>
   <button type="button" data-view="register">登録管理</button>
+  <button type="button" data-view="master">マスター</button>
   <button type="button" data-view="settings">設定</button>
 </nav>
 <main>
@@ -120,14 +122,12 @@
   <section id="view-register" style="display:none;">
     <div class="card">
       <h2>資材を登録</h2>
-      <label class="f">資材名</label>
-      <input type="text" id="reg-name" placeholder="例：サテンリボン 25mm">
-      <label class="f">色</label>
-      <input type="text" id="reg-color" placeholder="例：紺" list="color-list">
-      <datalist id="color-list"></datalist>
       <label class="f">ジャンル</label>
-      <input type="text" id="reg-genre" placeholder="例：リボン・装飾" list="genre-list">
-      <datalist id="genre-list"></datalist>
+      <select id="reg-genre"><option value="">選んでください</option></select>
+      <label class="f">資材名（ジャンルを選ぶと表示されます）</label>
+      <select id="reg-name" disabled><option value="">先にジャンルを選んでください</option></select>
+      <label class="f">色</label>
+      <select id="reg-color"><option value="">選んでください</option></select>
       <label class="f">登録時の在庫数</label>
       <input type="number" id="reg-count" min="0" value="0">
       <label class="f">品薄ライン（この数以下で「品薄」）</label>
@@ -135,12 +135,45 @@
       <label class="f">過多ライン（この数以上で「過多」）</label>
       <input type="number" id="reg-high" min="1" value="30">
       <label class="f">保管場所（任意・最初の保管場所コメントになります）</label>
-      <input type="text" id="reg-place" placeholder="例：資材棚A-2">
+      <select id="reg-place"><option value="">選ばない</option></select>
+      <p class="note">リストにない名前・色・場所は「マスター」画面で先に登録してください。表記ゆれ防止のため、ここでは自由入力できません。</p>
       <button type="button" class="btn-primary" id="btn-reg-add">登録する</button>
     </div>
     <div class="card">
       <h2>登録済みの資材（登録順）</h2>
       <div id="reg-list"></div>
+    </div>
+  </section>
+
+  <!-- マスター管理 -->
+  <section id="view-master" style="display:none;">
+    <div class="card">
+      <h2>マスター管理</h2>
+      <p class="note">登録画面で選べる「もと」のデータを管理します。名前を変えると、登録済みの資材にも連動して変わります。</p>
+    </div>
+    <div class="card">
+      <h2>ジャンル</h2>
+      <div class="filter-row"><input type="text" id="ms-genre-name" placeholder="新しいジャンル名"><button type="button" class="btn-sub" id="ms-genre-add" style="flex:0 0 84px;">追加</button></div>
+      <div id="ms-genre-list"></div>
+    </div>
+    <div class="card">
+      <h2>資材名マスター</h2>
+      <label class="f">ジャンル</label>
+      <select id="ms-item-genre"></select>
+      <label class="f">資材名</label>
+      <input type="text" id="ms-item-name" placeholder="例：LPリボン 5号">
+      <button type="button" class="btn-primary" id="ms-item-add">資材名を追加</button>
+      <div id="ms-item-list" style="margin-top:12px;"></div>
+    </div>
+    <div class="card">
+      <h2>色</h2>
+      <div class="filter-row"><input type="text" id="ms-color-name" placeholder="新しい色の名前"><button type="button" class="btn-sub" id="ms-color-add" style="flex:0 0 84px;">追加</button></div>
+      <div id="ms-color-list"></div>
+    </div>
+    <div class="card">
+      <h2>保管場所</h2>
+      <div class="filter-row"><input type="text" id="ms-place-name" placeholder="新しい保管場所"><button type="button" class="btn-sub" id="ms-place-add" style="flex:0 0 84px;">追加</button></div>
+      <div id="ms-place-list"></div>
     </div>
   </section>
 
@@ -211,7 +244,13 @@ function seed() {
     { name: 'セロファンロール', color: '透明', genre: 'ラッピング', count: 25, low: 8, high: 30 },
     { name: '結束バンド 200mm', color: '白', genre: '道具・消耗品', count: 12, low: 20, high: 200 }
   ];
-  db = { users: [], materials: [], orders: [], comments: [], history: [] };
+  db = { users: [], materials: [], orders: [], comments: [], history: [], masters: null };
+  db.masters = {
+    genres: ['土台・フォーム', 'ラッピング', 'リボン・装飾', '札・カード', '道具・消耗品'],
+    colors: ['緑', '白', '紺', '木目', '透明'],
+    places: ['資材棚A-2', '資材棚B-1（リボンケース）'],
+    items: mats.map((m, i) => ({ id: uid() + 'mi' + i, name: m.name, genre: m.genre }))
+  };
   mats.forEach((m, i) => {
     db.materials.push({ id: uid() + i, name: m.name, color: m.color, genre: m.genre, count: m.count, lowLine: m.low, highLine: m.high, createdAt: t - (mats.length - i) * 60000, createdById: null, createdByName: 'システム', updatedAt: t - 3600000, updatedByName: 'システム' });
   });
@@ -224,6 +263,20 @@ function seed() {
 function load() {
   try { db = JSON.parse(localStorage.getItem(LS_KEY)); } catch (e) { db = null; }
   if (!db || !Array.isArray(db.materials)) seed();
+  if (!db.masters) {
+    // 既存データからマスターを自動生成（移行）
+    const g = new Set(), c = new Set(), p = new Set();
+    db.materials.forEach((m) => { if (m.genre) g.add(m.genre); if (m.color) c.add(m.color); });
+    db.comments.forEach((x) => { if (x.section === 'place' && x.text) p.add(x.text); });
+    const seen = new Set();
+    const items = [];
+    db.materials.forEach((m) => {
+      const k = m.genre + '|' + m.name;
+      if (!seen.has(k)) { seen.add(k); items.push({ id: uid() + items.length, name: m.name, genre: m.genre }); }
+    });
+    db.masters = { genres: Array.from(g), colors: Array.from(c), places: Array.from(p), items: items };
+    save();
+  }
 }
 function userById(id) { return db.users.find((u) => u.id === id) || null; }
 function currentUser() { return userById(currentUserId); }
@@ -288,7 +341,7 @@ function shouldLogEdit(item) {
 const $ = (id) => document.getElementById(id);
 function showView(v) {
   currentView = v;
-  ['stock', 'detail', 'orders', 'register', 'settings'].forEach((k) => {
+  ['stock', 'detail', 'orders', 'register', 'master', 'settings'].forEach((k) => {
     $('view-' + k).style.display = (k === v) ? '' : 'none';
   });
   document.querySelectorAll('nav.tabs button').forEach((b) => {
@@ -297,6 +350,7 @@ function showView(v) {
   if (v === 'stock') renderStock();
   if (v === 'orders') renderOrders();
   if (v === 'register') renderRegister();
+  if (v === 'master') renderMasters();
   if (v === 'settings') renderSettings();
 }
 document.querySelectorAll('nav.tabs button').forEach((b) => {
@@ -340,6 +394,7 @@ $('stock-genre').addEventListener('change', renderStock);
 
 // ===== 資材詳細 =====
 let editingCommentId = null;
+let editingMaterial = false;
 function latestPlace(materialId) {
   const cs = db.comments.filter((c) => c.materialId === materialId && c.section === 'place');
   if (!cs.length) return '未設定';
@@ -348,6 +403,7 @@ function latestPlace(materialId) {
 function openDetail(id) {
   currentDetailId = id;
   editingCommentId = null;
+  editingMaterial = false;
   showView('detail');
   renderDetail();
 }
@@ -408,7 +464,8 @@ function renderDetail() {
       '<label class="f">在庫数を更新</label>' +
       '<div class="stock-ctl"><button type="button" id="stk-minus">−</button><input type="number" id="stk-input" value="' + m.count + '" min="0"><button type="button" id="stk-plus">＋</button></div>' +
       '<button type="button" class="btn-primary" id="stk-save">在庫数を保存</button>' +
-      (mine ? '<div class="row-btns"><button type="button" class="btn-sub" id="mat-edit">資材情報を編集</button><button type="button" class="btn-danger" id="mat-del">この資材を削除</button></div>' : '') +
+      (mine && !editingMaterial ? '<div class="row-btns"><button type="button" class="btn-sub" id="mat-edit">資材情報を編集</button><button type="button" class="btn-danger" id="mat-del">この資材を削除</button></div>' : '') +
+      (mine && editingMaterial ? editFormHtml(m) : '') +
     '</div>' +
     '<div class="acc" id="acc-order"><button type="button" class="acc-head" data-acc="acc-order">発注・数量 <span>▾</span></button><div class="acc-body">' + ordersHtml + '<hr style="border:none;border-top:1px solid #e7e7e4;margin:10px 0;">' + threadHtml(m.id, 'order') + '</div></div>' +
     '<div class="acc" id="acc-place"><button type="button" class="acc-head" data-acc="acc-place">保管場所 <span>▾</span></button><div class="acc-body">' + threadHtml(m.id, 'place') + '</div></div>' +
@@ -432,7 +489,7 @@ function renderDetail() {
     save();
     renderDetail();
   });
-  if (mine) {
+  if (mine && !editingMaterial) {
     $('mat-del').addEventListener('click', () => {
       if (!confirm('「' + m.name + '」を削除しますか？（履歴には削除の記録が残ります）')) return;
       addHistory(m.id, 'delete', '資材「' + m.name + '」を削除', { red: true, materialName: m.name });
@@ -442,7 +499,13 @@ function renderDetail() {
       save();
       showView('stock');
     });
-    $('mat-edit').addEventListener('click', () => editMaterial(m));
+    $('mat-edit').addEventListener('click', () => startEditMaterial());
+  }
+  if (mine && editingMaterial) {
+    fillEditNames(m);
+    $('ed-genre').addEventListener('change', () => fillEditNames(m));
+    $('ed-cancel').addEventListener('click', () => { editingMaterial = false; renderDetail(); });
+    $('ed-save').addEventListener('click', () => saveEditMaterial(m));
   }
   // コメント操作（イベント委譲）
   $('detail-body').querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => handleCommentAction(b, m)));
@@ -508,29 +571,55 @@ function keepAccordionsOpen() {
     if (el) el.classList.add('open');
   });
 }
-function editMaterial(m) {
-  const name = prompt('資材名', m.name);
-  if (name === null) return;
-  const color = prompt('色', m.color || '');
-  if (color === null) return;
-  const genre = prompt('ジャンル', m.genre || '');
-  if (genre === null) return;
-  const low = prompt('品薄ライン（この数以下で品薄）', m.lowLine);
-  if (low === null) return;
-  const high = prompt('過多ライン（この数以上で過多）', m.highLine);
-  if (high === null) return;
+function optsWithCurrent(list, current) {
+  const arr = list.slice();
+  if (current && !arr.includes(current)) arr.push(current);
+  return arr;
+}
+function editFormHtml(m) {
+  const genreOpts = optsWithCurrent(db.masters.genres, m.genre).map((g) => '<option value="' + esc(g) + '"' + (g === m.genre ? ' selected' : '') + '>' + esc(g) + '</option>').join('');
+  const colorOpts = optsWithCurrent(db.masters.colors, m.color).map((c) => '<option value="' + esc(c) + '"' + (c === m.color ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+  return '<div style="border-top:1px solid #e7e7e4;margin-top:12px;padding-top:4px;">' +
+    '<label class="f">ジャンル</label><select id="ed-genre">' + genreOpts + '</select>' +
+    '<label class="f">資材名</label><select id="ed-name"></select>' +
+    '<label class="f">色</label><select id="ed-color">' + colorOpts + '</select>' +
+    '<label class="f">品薄ライン</label><input type="number" id="ed-low" min="0" value="' + m.lowLine + '">' +
+    '<label class="f">過多ライン</label><input type="number" id="ed-high" min="1" value="' + m.highLine + '">' +
+    '<div class="row-btns"><button type="button" class="btn-sub" id="ed-save">保存する</button><button type="button" class="btn-sub" id="ed-cancel">キャンセル</button></div></div>';
+}
+function fillEditNames(m) {
+  const g = $('ed-genre').value;
+  const names = db.masters.items.filter((x) => x.genre === g).map((x) => x.name);
+  const list = optsWithCurrent(names, m && g === m.genre ? m.name : null);
+  $('ed-name').innerHTML = list.map((n) => '<option value="' + esc(n) + '"' + (m && n === m.name ? ' selected' : '') + '>' + esc(n) + '</option>').join('') || '<option value="">このジャンルの資材名がマスターにありません</option>';
+}
+function startEditMaterial() {
+  editingMaterial = true;
+  renderDetail();
+  const m = materialById(currentDetailId);
+  if (m) fillEditNames(m);
+}
+function saveEditMaterial(m) {
+  const genre = $('ed-genre').value;
+  const name = $('ed-name').value;
+  const color = $('ed-color').value;
+  if (!genre || !name || !color) { alert('ジャンル・資材名・色を選んでください'); return; }
+  if (db.materials.some((x) => x.id !== m.id && x.name === name && x.color === color)) {
+    alert('「' + name + '（' + color + '）」はすでに別の資材として登録されています');
+    return;
+  }
+  const low = Math.max(0, parseInt($('ed-low').value, 10) || 0);
+  const high = Math.max(1, parseInt($('ed-high').value, 10) || 1);
   const changes = [];
-  if (name.trim() && name.trim() !== m.name) changes.push('名前「' + m.name + '」→「' + name.trim() + '」');
+  if (name !== m.name) changes.push('名前「' + m.name + '」→「' + name + '」');
   if (color !== m.color) changes.push('色「' + (m.color || '—') + '」→「' + color + '」');
   if (genre !== m.genre) changes.push('ジャンル「' + (m.genre || '—') + '」→「' + genre + '」');
-  if (parseInt(low, 10) !== m.lowLine) changes.push('品薄ライン ' + m.lowLine + '→' + parseInt(low, 10));
-  if (parseInt(high, 10) !== m.highLine) changes.push('過多ライン ' + m.highLine + '→' + parseInt(high, 10));
-  if (!changes.length) return;
+  if (low !== m.lowLine) changes.push('品薄ライン ' + m.lowLine + '→' + low);
+  if (high !== m.highLine) changes.push('過多ライン ' + m.highLine + '→' + high);
+  editingMaterial = false;
+  if (!changes.length) { renderDetail(); return; }
   const rec = { createdAt: m.createdAt, createdById: m.createdById, authorId: m.createdById };
-  m.name = name.trim() || m.name;
-  m.color = color; m.genre = genre;
-  m.lowLine = Math.max(0, parseInt(low, 10) || 0);
-  m.highLine = Math.max(1, parseInt(high, 10) || 1);
+  m.name = name; m.color = color; m.genre = genre; m.lowLine = low; m.highLine = high;
   if (shouldLogEdit(rec)) {
     addHistory(m.id, 'edit', '資材情報を編集：' + changes.join('、'), { mergeKey: 'material:' + m.id, fromText: changes.join('、'), toText: changes.join('、') });
   }
@@ -643,11 +732,22 @@ function handleOrderAction(b) {
 }
 
 // ===== 登録管理 =====
+function fillRegNames() {
+  const g = $('reg-genre').value;
+  const sel = $('reg-name');
+  if (!g) { sel.innerHTML = '<option value="">先にジャンルを選んでください</option>'; sel.disabled = true; return; }
+  const items = db.masters.items.filter((x) => x.genre === g);
+  sel.innerHTML = items.length ? items.map((x) => '<option value="' + esc(x.name) + '">' + esc(x.name) + '</option>').join('') : '<option value="">このジャンルの資材名がマスターにありません</option>';
+  sel.disabled = !items.length;
+}
 function renderRegister() {
-  $('genre-list').innerHTML = genres().map((g) => '<option value="' + esc(g) + '">').join('');
-  const colors = new Set();
-  db.materials.forEach((m) => { if (m.color) colors.add(m.color); });
-  $('color-list').innerHTML = Array.from(colors).map((c) => '<option value="' + esc(c) + '">').join('');
+  const gsel = $('reg-genre');
+  const gcur = gsel.value;
+  gsel.innerHTML = '<option value="">選んでください</option>' + db.masters.genres.map((g) => '<option value="' + esc(g) + '">' + esc(g) + '</option>').join('');
+  gsel.value = gcur;
+  $('reg-color').innerHTML = '<option value="">選んでください</option>' + db.masters.colors.map((c) => '<option value="' + esc(c) + '">' + esc(c) + '</option>').join('');
+  $('reg-place').innerHTML = '<option value="">選ばない</option>' + db.masters.places.map((p) => '<option value="' + esc(p) + '">' + esc(p) + '</option>').join('');
+  fillRegNames();
   const box = $('reg-list');
   if (!db.materials.length) { box.innerHTML = '<p class="note">登録済みの資材はありません。</p>'; return; }
   box.innerHTML = db.materials.map((m) => {
@@ -671,19 +771,27 @@ function renderRegister() {
       save();
       renderRegister();
     } else {
-      currentDetailId = m.id;
-      editMaterial(m);
-      renderRegister();
+      openDetail(m.id);
+      startEditMaterial();
     }
   }));
 }
+$('reg-genre').addEventListener('change', fillRegNames);
 $('btn-reg-add').addEventListener('click', () => {
   const u = currentUser();
   if (!u) { alert('先にアカウントを登録してください'); showView('settings'); return; }
-  const name = ($('reg-name').value || '').trim();
-  if (!name) { alert('資材名を入れてください'); return; }
+  const genre = $('reg-genre').value;
+  const name = $('reg-name').value;
+  const color = $('reg-color').value;
+  if (!genre) { alert('ジャンルを選んでください'); return; }
+  if (!name) { alert('資材名を選んでください'); return; }
+  if (!color) { alert('色を選んでください'); return; }
+  if (db.materials.some((x) => x.name === name && x.color === color)) {
+    alert('「' + name + '（' + color + '）」はすでに登録されています。在庫数の変更は在庫一覧の詳細から行ってください');
+    return;
+  }
   const m = {
-    id: uid(), name: name, color: ($('reg-color').value || '').trim(), genre: ($('reg-genre').value || '').trim(),
+    id: uid(), name: name, color: color, genre: genre,
     count: Math.max(0, parseInt($('reg-count').value, 10) || 0),
     lowLine: Math.max(0, parseInt($('reg-low').value, 10) || 0),
     highLine: Math.max(1, parseInt($('reg-high').value, 10) || 1),
@@ -691,12 +799,123 @@ $('btn-reg-add').addEventListener('click', () => {
   };
   db.materials.push(m);
   addHistory(m.id, 'create', '資材「' + m.name + '」を登録（初期在庫 ' + m.count + '）', { materialName: m.name });
-  const place = ($('reg-place').value || '').trim();
+  const place = $('reg-place').value;
   if (place) db.comments.push({ id: uid(), materialId: m.id, section: 'place', authorId: u.id, authorName: u.name, text: place, createdAt: now(), editedAt: null });
   save();
-  $('reg-name').value = ''; $('reg-color').value = ''; $('reg-genre').value = ''; $('reg-count').value = 0; $('reg-place').value = '';
+  $('reg-count').value = 0; $('reg-place').value = '';
   renderRegister();
 });
+
+// ===== マスター管理 =====
+function masterRow(label, act, val) {
+  return '<div class="hist"><span style="font-size:15.5px;">' + esc(label) + '</span>' +
+    '<span class="row-btns" style="display:inline-flex;margin-left:10px;">' +
+    '<button type="button" class="btn-sub btn-mini" data-mact="' + act + '-edit" data-val="' + esc(val) + '">編集</button>' +
+    '<button type="button" class="btn-danger btn-mini" data-mact="' + act + '-del" data-val="' + esc(val) + '">削除</button></span></div>';
+}
+function renderMasters() {
+  const M = db.masters;
+  $('ms-genre-list').innerHTML = M.genres.map((g) => masterRow(g, 'genre', g)).join('') || '<p class="note">なし</p>';
+  $('ms-color-list').innerHTML = M.colors.map((c) => masterRow(c, 'color', c)).join('') || '<p class="note">なし</p>';
+  $('ms-place-list').innerHTML = M.places.map((p) => masterRow(p, 'place', p)).join('') || '<p class="note">なし</p>';
+  const gsel = $('ms-item-genre');
+  const gcur = gsel.value;
+  gsel.innerHTML = M.genres.map((g) => '<option value="' + esc(g) + '">' + esc(g) + '</option>').join('');
+  if (gcur) gsel.value = gcur;
+  $('ms-item-list').innerHTML = M.genres.map((g) => {
+    const items = M.items.filter((x) => x.genre === g);
+    if (!items.length) return '';
+    return '<div class="meta" style="margin-top:8px;font-weight:700;">' + esc(g) + '</div>' + items.map((x) =>
+      '<div class="hist"><span style="font-size:15.5px;">' + esc(x.name) + '</span>' +
+      '<span class="row-btns" style="display:inline-flex;margin-left:10px;">' +
+      '<button type="button" class="btn-sub btn-mini" data-mact="item-edit" data-val="' + x.id + '">編集</button>' +
+      '<button type="button" class="btn-danger btn-mini" data-mact="item-del" data-val="' + x.id + '">削除</button></span></div>').join('');
+  }).join('') || '<p class="note">なし</p>';
+  document.querySelectorAll('#view-master [data-mact]').forEach((b) => b.addEventListener('click', () => handleMasterAction(b)));
+}
+function addMasterValue(kind, inputId) {
+  const v = ($(inputId).value || '').trim();
+  if (!v) { alert('名前を入れてください'); return; }
+  const list = db.masters[kind];
+  if (list.includes(v)) { alert('すでにあります'); return; }
+  list.push(v);
+  save();
+  $(inputId).value = '';
+  renderMasters();
+}
+$('ms-genre-add').addEventListener('click', () => addMasterValue('genres', 'ms-genre-name'));
+$('ms-color-add').addEventListener('click', () => addMasterValue('colors', 'ms-color-name'));
+$('ms-place-add').addEventListener('click', () => addMasterValue('places', 'ms-place-name'));
+$('ms-item-add').addEventListener('click', () => {
+  const g = $('ms-item-genre').value;
+  const name = ($('ms-item-name').value || '').trim();
+  if (!g) { alert('ジャンルを選んでください'); return; }
+  if (!name) { alert('資材名を入れてください'); return; }
+  if (db.masters.items.some((x) => x.genre === g && x.name === name)) { alert('すでにあります'); return; }
+  db.masters.items.push({ id: uid(), name: name, genre: g });
+  save();
+  $('ms-item-name').value = '';
+  renderMasters();
+});
+function handleMasterAction(b) {
+  const act = b.dataset.mact;
+  const val = b.dataset.val;
+  const M = db.masters;
+  if (act === 'genre-edit' || act === 'color-edit' || act === 'place-edit') {
+    const kind = act.split('-')[0] === 'genre' ? 'genres' : act.split('-')[0] === 'color' ? 'colors' : 'places';
+    const nv = prompt('新しい名前', val);
+    if (nv === null) return;
+    const name = nv.trim();
+    if (!name || name === val) return;
+    if (M[kind].includes(name)) { alert('すでにあります'); return; }
+    M[kind] = M[kind].map((x) => (x === val ? name : x));
+    // 登録済みデータへ連動
+    if (kind === 'genres') {
+      db.materials.forEach((m) => { if (m.genre === val) m.genre = name; });
+      M.items.forEach((x) => { if (x.genre === val) x.genre = name; });
+    }
+    if (kind === 'colors') db.materials.forEach((m) => { if (m.color === val) m.color = name; });
+    if (kind === 'places') db.comments.forEach((c) => { if (c.section === 'place' && c.text === val) c.text = name; });
+    save();
+    renderMasters();
+  }
+  if (act === 'genre-del' || act === 'color-del' || act === 'place-del') {
+    const kind = act.split('-')[0] === 'genre' ? 'genres' : act.split('-')[0] === 'color' ? 'colors' : 'places';
+    if (kind === 'genres' && M.items.some((x) => x.genre === val)) {
+      alert('このジャンルには資材名マスターが残っています。先に資材名を削除するか、別のジャンルへ編集で移してください');
+      return;
+    }
+    if (!confirm('「' + val + '」をマスターから削除しますか？（登録済みの資材の表示はそのまま残ります）')) return;
+    M[kind] = M[kind].filter((x) => x !== val);
+    save();
+    renderMasters();
+  }
+  if (act === 'item-edit') {
+    const it = M.items.find((x) => x.id === val);
+    if (!it) return;
+    const nv = prompt('資材名', it.name);
+    if (nv === null) return;
+    const name = nv.trim();
+    if (!name) return;
+    if (name !== it.name) {
+      if (M.items.some((x) => x.genre === it.genre && x.name === name)) { alert('同じジャンルに同名があります'); return; }
+      // 同じ名前・ジャンルの登録済み資材にも連動
+      db.materials.forEach((m) => { if (m.name === it.name && m.genre === it.genre) m.name = name; });
+      db.history.forEach((h) => { if (h.materialName === it.name) h.materialName = name; });
+      it.name = name;
+    }
+    save();
+    renderMasters();
+  }
+  if (act === 'item-del') {
+    const it = M.items.find((x) => x.id === val);
+    if (!it) return;
+    if (!confirm('資材名「' + it.name + '」をマスターから削除しますか？（登録済みの資材はそのまま残ります）')) return;
+    M.items = M.items.filter((x) => x.id !== val);
+    save();
+    renderMasters();
+  }
+}
 
 // ===== 設定（アカウントDB・全体履歴） =====
 function renderSettings() {
