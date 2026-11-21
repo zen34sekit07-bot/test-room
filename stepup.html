@@ -8,7 +8,9 @@ AIアシスタント: Gemini (Google) / Muse (Meta)
 技術スタック: HTML5, CSS3, Vanilla JS, Chart.js
 役職別の配布資料「キャリアステップ・ガイド」の目標項目をもとにした
 固定アンケート（5軸×3問＝15問、1〜5の自己評価）で、レーダーチャート・
-達成度・現在の状態・今後へのアドバイスを表示する自己診断ツール。
+達成度・現在の状態・今後へのアドバイスと、弱みを埋めるロードマップ
+（すぐできること／少しずつやること）を表示する自己診断ツール。
+結果はPDFでもダウンロードできる。
 結果は数値の組み合わせから決定的に生成する（AI生成文は使わない）。
 ==================================================
 -->
@@ -24,6 +26,8 @@ AIアシスタント: Gemini (Google) / Muse (Meta)
   <meta name="apple-mobile-web-app-title" content="ステップアップ診断">
   <meta name="theme-color" content="#f4f4f2">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -211,6 +215,12 @@ AIアシスタント: Gemini (Google) / Muse (Meta)
     .advice-item:last-child { margin-bottom: 0; }
     .advice-axis { font-size: 15px; font-weight: 700; color: #171717; margin: 0 0 3px 0; }
     .advice-text { font-size: 15.5px; line-height: 1.6; color: #262626; margin: 0; }
+    .roadmap-item { border-left: 3px solid #2563eb; padding: 2px 0 2px 12px; margin-bottom: 18px; }
+    .roadmap-item:last-child { margin-bottom: 0; }
+    .roadmap-axis { font-size: 15px; font-weight: 700; color: #171717; margin: 0 0 4px 0; }
+    .roadmap-phase { font-size: 14px; font-weight: 700; color: #1d4ed8; margin: 9px 0 4px 0; }
+    .roadmap-ul { margin: 0; padding-left: 20px; }
+    .roadmap-ul li { font-size: 15px; line-height: 1.6; color: #262626; margin-bottom: 3px; }
     #save-status { font-size: 15px; line-height: 1.6; color: #262626; margin: 0 0 12px 0; }
     .result-actions { display: flex; flex-direction: column; gap: 10px; }
     .btn-link {
@@ -292,7 +302,7 @@ AIアシスタント: Gemini (Google) / Muse (Meta)
       </div>
       <details class="settings">
         <summary>結果の保存先設定（管理者用）</summary>
-        <p>診断結果を送る Google Apps Script（ウェブアプリ）のURLを設定します。設定すると、結果画面で自動的に送信されます。未設定のときは、結果画面の「結果をダウンロード」から保存できます。</p>
+        <p>診断結果を送る Google Apps Script（ウェブアプリ）のURLを設定します。設定すると、結果画面で自動的に送信されます。未設定のときは、結果画面の「結果をPDFでダウンロード」から保存できます。</p>
         <input id="input-gas-url" type="url" placeholder="https://script.google.com/macros/s/…/exec">
         <button type="button" id="btn-save-gas" class="btn-sub">設定を保存する</button>
         <p id="gas-saved-msg" class="hint"></p>
@@ -338,10 +348,16 @@ AIアシスタント: Gemini (Google) / Muse (Meta)
         <div id="advice-list"></div>
       </div>
       <div class="card">
+        <h3 class="sec-title">弱みを埋めるロードマップ</h3>
+        <p class="body-text">弱かった軸について、「今からすぐできること」と「先を見据えて少しずつやっていくこと」に分けた具体的な手順です。</p>
+        <div id="roadmap-list"></div>
+      </div>
+      <div class="card">
         <h3 class="sec-title">結果の保存</h3>
         <p id="save-status">結果を保存しています…</p>
         <div class="result-actions">
-          <button type="button" id="btn-download" class="btn-primary">結果をダウンロード</button>
+          <button type="button" id="btn-download" class="btn-primary">結果をPDFでダウンロード</button>
+          <p id="download-note" class="hint"></p>
           <button type="button" id="btn-retry" class="btn-sub">もう一度診断する</button>
           <a class="btn-link" href="index.html">ポータルへ戻る</a>
         </div>
@@ -590,6 +606,61 @@ AIアシスタント: Gemini (Google) / Muse (Meta)
       }
     };
 
+
+    // ===== ロードマップ定義（固定） =====
+    // 最も低い2軸について、「今からすぐできること」と「先を見据えて少しずつやっていくこと」を出す。
+    // 文面は配布資料「キャリアステップ・ガイド」の「実のある行動」「身につけるべき能力」に基づく。
+    const ROADMAP = {
+      shinjin: [
+        { now: ['仕事の進み具合は、終わってからではなく途中の段階で、短く・結論から報告する', '分からないことや困ったことが出たら、抱え込まずその場で周囲に伝える'],
+          later: ['報告の前に要点をメモに整理し、「早く・短く・結論から」の型を身につける', '相談の前に自分の考えを添えられるよう、少しずつ準備してから話す練習をする'] },
+        { now: ['任された仕事は手順を確認してから始め、期限をメモやカレンダーに書き出す', '期限が危ないと感じたら、直前ではなくその日のうちに相談する'],
+          later: ['担当業務の正しい手順（仕事の型）を身につけ、正確に進められる範囲を広げる', '納期から逆算して段取りを組めるよう、自分の仕事の所要時間を把握していく'] },
+        { now: ['指示を受けたらメモを取り、その場で復唱して認識のズレをなくす', '仕事を始める前に、手順と必要なものを書き出してから取りかかる'],
+          later: ['複数の仕事があるとき、自分で優先順位をつけてから上司に確認する形にしていく', '段取りの基礎を型として身につけ、初めての仕事でも手順を自分で整理できるようにする'] },
+        { now: ['手が空いたら、周囲の手伝いや次の準備に自分から取り組む', '「分からない」は弱さではなく早めに出すべき情報として、その日のうちに伝える'],
+          later: ['指示を待たずに次にやるべきことを見つける場面を、少しずつ増やしていく（前に踏み出す力）', '自分から動いた結果を振り返り、判断の材料を蓄えていく'] },
+        { now: ['挨拶・時間・約束を守る当たり前を徹底する', '相手の話を最後まで聞き、意図を確認してから答える'],
+          later: ['自分の状況を、相手に伝わる言葉で分かりやすく伝える練習を重ねる（聞く力・伝える力）', 'チームの一員として周囲と連携する範囲を広げ、チームで進める感覚を身につける'] }
+      ],
+      ippan: [
+        { now: ['担当業務の優先順位を自分でつけ、上司の意図を先読みして指示の先まで動く', '朝のうちに今日の段取りを組み立て、最後までやり切る'],
+          later: ['計画力（考え抜く力）を高め、月単位の見通しを持って担当業務を回せるようにする', '「自分が責任者」の意識で、担当全体の段取りを自分で組み立てる範囲を広げる'] },
+        { now: ['相談は「どうしますか」ではなく「こうしたいです」と、提案の形で持ち込む', '仕事の問題に気づいたら、原因を自分で考えてから相談する'],
+          later: ['課題発見力を磨き、問題が起きる前に気づいて手を打てるようにする', '提案に数字や事例などの根拠を添え、説得力を高めていく'] },
+        { now: ['気づいたムダや不便を、小さくても改善案にして持ち込む', '提案した改善は実際に試して、結果まで確かめる'],
+          later: ['自分の仕事を数字や実績で振り返る習慣をつけ、改善の効果を測れるようにする', '改善の進め方を型として身につけ、担当範囲全体へ広げていく'] },
+        { now: ['自分の手順やノウハウを、マニュアルやメモに残して共有する', '分からない専門事項は、自分で調べて解決まで持っていく'],
+          later: ['担当分野の専門知識・技能の深さと幅を広げ続ける（テクニカルスキルの充実）', '共有した手順を周囲の声で磨き、誰でもできる形に育てていく'] },
+        { now: ['後輩に教えるときは、答えだけでなく理由まで伝える', '後輩にとって聞きやすい存在になるよう、自分から声をかける'],
+          later: ['後輩指導と関係調整の力を伸ばし、周囲を巻き込んで進める場面を増やす（ヒューマンスキルの芽生え）', '自分の言動が後輩の手本になることを自覚し、当たり前の水準を上げる側に回る'] }
+      ],
+      shunin: [
+        { now: ['チーム目標を、メンバー一人ひとりの仕事に翻訳して伝える', '今の割り振りが、メンバーの力と状況に合っているか点検する'],
+          later: ['「自分がやった方が早い」を抑え、任せる判断と割り振りの設計を仕組みにしていく', 'メンバー一人ひとりの成長段階に合わせた仕事の渡し方を、計画的に行えるようにする'] },
+        { now: ['チームの進捗を見える化し、遅れを早い段階で拾う場をつくる', '任せた仕事は節目で確認し、結果だけでなく過程にもフィードバックする'],
+          later: ['段取り・進捗管理と優先順位づけの力を高め、チーム全体の調整を仕組みで回せるようにする', '遅れの兆しを早くつかむ見方を身につけ、先回りの調整ができるようにする'] },
+        { now: ['声かけや短い面談の時間を、余った時間ではなく先に予定へ入れる', 'メンバー一人ひとりの状態と困りごとを、短い面談で把握する'],
+          later: ['育成をリーダーの中心業務として、メンバーごとの成長に合わせた計画を持つ', '任せ方・教え方を振り返り、育成の進め方を少しずつ改善していく'] },
+        { now: ['メンバーの話を最後まで聞き、気持ちや事情をくみ取ってから対応する', '意見の違いが出た場では、双方の言い分を整理してから前に進める'],
+          later: ['人を動かし、育て、調整する力（ヒューマンスキル）を、この段階の中心として磨き続ける', 'メンバー一人ひとりに合わせた動機づけや声かけを工夫できるようにする'] },
+        { now: ['問題はチームの中でまず解決に動き、上へは対策案とセットで報告する', '現場の状況と課題を、正確に・早めに上へつなぐ'],
+          later: ['チームの仕事を会社全体の中で捉える視点を広げる（コンセプチュアルスキルの入口）', '上と現場の両方の言葉で話せるよう、一段上の視点で考える習慣をつける'] }
+      ],
+      kakaricho: [
+        { now: ['部門の目標と実行計画のたたき台を、自分の言葉で書き出す', '経営方針を、現場の計画の言葉に落とし込んで係に伝える'],
+          later: ['目先の数字と、将来のための人づくり・仕組みづくりを両立させる計画運用を身につける', '方針→計画→実行→振り返りのサイクルを、部門の型として回せるようにする'] },
+        { now: ['部門の進捗と成果を語る評価の尺度を決め、数字で語る場を定期的に持つ', '判断したことは、数字と根拠で説明できるよう記録に残す'],
+          later: ['財務・労務・コンプライアンスなど経営の基礎知識を計画的に学び、部門の数字を読める幅を広げる', '意思決定への説明責任を果たせるよう、判断の根拠を体系立てて示す力をつける'] },
+        { now: ['人の配置と役割分担を、部門全体を見て点検し直す', '係長に任せる範囲を決めて権限を委ね、自分は細部から手を離す場面を増やす'],
+          later: ['人の配置と役割分担を設計する力（組織する）を高め、担当が替わっても回る体制をつくる', '労務・コンプライアンスの観点で、組織のリスクを先回りして管理できるようにする'] },
+        { now: ['次を担う人材へ、判断の機会を計画的に渡す場面を決める', '育成の取り組みを、後継者づくりにつながる形で記録し始める'],
+          later: ['係長を育てる計画を持ち、人づくりを部門目標の一つとして運用する（人材を育成する）', '任せる範囲を段階的に広げ、育成の成果が組織の持続につながる形にしていく'] },
+        { now: ['他部門との調整や交渉は、自分が前面に立って行う', '自部門の判断を、会社全体の全体最適の観点で一度見直す'],
+          later: ['組織全体を一体として捉え、一部の変更が全体へ与える影響を読む力（コンセプチュアルスキル）を磨く', '経営と現場の結節点として、現場の実情を経営へ返し続ける'] }
+      ]
+    };
+
     // レーダーチャート用の軸ラベル（長い軸名は2行に割って、左右の見切れを防ぐ）
     const CHART_LABELS = {
       shinjin: [['報連相'], ['正確さと', '期限'], ['仕事の', '段取り'], ['自分から', '動く姿勢'], ['チームで', '働く力']],
@@ -823,6 +894,42 @@ AIアシスタント: Gemini (Google) / Muse (Meta)
         d.innerHTML = '<p class="advice-axis">' + axisLabel + '</p><p class="advice-text">' + role.axes[ai].advice + '</p>';
         adv.appendChild(d);
       });
+      // ロードマップ：最も低い2軸について「すぐできること／少しずつやること」を提示
+      const roadmapItems = [];
+      const rmList = $('roadmap-list');
+      rmList.innerHTML = '';
+      [order[0], order[1]].forEach((ai) => {
+        const rm = ROADMAP[state.role][ai];
+        const item = {
+          axis: role.axes[ai].name,
+          pct: axisPcts[ai],
+          now: rm.now.slice(),
+          later: rm.later.slice()
+        };
+        roadmapItems.push(item);
+        const d = document.createElement('div');
+        d.className = 'roadmap-item';
+        const head = document.createElement('p');
+        head.className = 'roadmap-axis';
+        head.textContent = '「' + item.axis + '」（' + item.pct + '%）を埋める手順';
+        d.appendChild(head);
+        [['今からすぐできること', item.now], ['先を見据えて少しずつやっていくこと', item.later]].forEach((pair) => {
+          const ph = document.createElement('p');
+          ph.className = 'roadmap-phase';
+          ph.textContent = pair[0];
+          d.appendChild(ph);
+          const ul = document.createElement('ul');
+          ul.className = 'roadmap-ul';
+          pair[1].forEach((t) => {
+            const li = document.createElement('li');
+            li.textContent = t;
+            ul.appendChild(li);
+          });
+          d.appendChild(ul);
+        });
+        rmList.appendChild(d);
+      });
+
       combinationAdvice(role, axisPcts).forEach((txt) => {
         adviceItems.push({ axis: '組み合わせから見えること', text: txt });
         const d = document.createElement('div');
@@ -841,7 +948,8 @@ AIアシスタント: Gemini (Google) / Muse (Meta)
         answers: state.answers.slice(),
         stateTitle: band.title,
         stateText: stateTextFull,
-        advice: adviceItems
+        advice: adviceItems,
+        roadmap: roadmapItems
       };
       state.result = payload;
       window.__lastResult = payload;
@@ -853,9 +961,16 @@ AIアシスタント: Gemini (Google) / Muse (Meta)
     // レーダーチャートをPNG（data URL）化する。取得できない場合は null を返し、送信自体は失敗させない
     function captureChartImage() {
       return new Promise((resolve) => {
+        const waitStart = Date.now();
+        const tryCapture = () => {
         try {
           const src = $('radar-chart');
-          if (!state.chart || !src || !src.width || !src.height) return resolve(null);
+          if (!state.chart || !src) return resolve(null);
+          // 結果画面が表示されるまでキャンバスのサイズが0の場合があるため、少し待つ
+          if (!src.width || !src.height) {
+            if (Date.now() - waitStart < 2000) { setTimeout(tryCapture, 100); return; }
+            return resolve(null);
+          }
           let done = false;
           const finish = () => {
             if (done) return;
@@ -886,6 +1001,8 @@ AIアシスタント: Gemini (Google) / Muse (Meta)
           }
           setTimeout(finish, 2600);
         } catch (e) { resolve(null); }
+        };
+        tryCapture();
       });
     }
 
@@ -893,7 +1010,7 @@ AIアシスタント: Gemini (Google) / Muse (Meta)
       const el = $('save-status');
       const url = getGasUrl();
       if (!url) {
-        el.textContent = '保存先が未設定のため、この結果はまだ保存されていません。下の「結果をダウンロード」から保存してください。';
+        el.textContent = '保存先が未設定のため、この結果はまだ保存されていません。下の「結果をPDFでダウンロード」から保存してください。';
         return;
       }
       el.textContent = '結果を保存しています…';
@@ -907,26 +1024,133 @@ AIアシスタント: Gemini (Google) / Muse (Meta)
           headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify(sendPayload)
         });
-        el.textContent = '結果を保存先へ送信しました。念のため、手元にも残したい場合は「結果をダウンロード」をご利用ください。';
+        el.textContent = '結果を保存先へ送信しました。念のため、手元にも残したい場合は「結果をPDFでダウンロード」をご利用ください。';
       } catch (e) {
-        el.textContent = '保存に失敗しました。結果が消えないよう、下の「結果をダウンロード」から保存してください。';
+        el.textContent = '保存に失敗しました。結果が消えないよう、下の「結果をPDFでダウンロード」から保存してください。';
       }
     }
 
-    $('btn-download').addEventListener('click', () => {
-      if (!state.result) return;
-      const d = new Date();
+    // 結果PDF用シートを組み立てる（A4幅の文書レイアウト。画面には表示しない）
+    function buildPdfSheet(r, chartImage) {
+      const sheet = document.createElement('div');
+      sheet.style.cssText = 'position:fixed;left:-10000px;top:0;width:760px;background:#ffffff;color:#171717;padding:44px 48px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Sans","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;';
+      const el = (tag, text, css) => {
+        const e = document.createElement(tag);
+        if (text !== null && text !== undefined) e.textContent = text;
+        if (css) e.style.cssText = css;
+        return e;
+      };
+      sheet.appendChild(el('div', 'ステップアップ診断 結果', 'font-size:26px;font-weight:800;margin-bottom:6px;'));
+      const when = new Date(r.timestamp);
       const pad = (n) => String(n).padStart(2, '0');
-      const fname = 'stepup-result-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.json';
-      const blob = new Blob([JSON.stringify(state.result, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = fname;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 3000);
-    });
+      const dateStr = when.getFullYear() + '/' + pad(when.getMonth() + 1) + '/' + pad(when.getDate()) + ' ' + pad(when.getHours()) + ':' + pad(when.getMinutes());
+      sheet.appendChild(el('div', '日時：' + dateStr + '　役職：' + r.role + (r.name ? '　氏名：' + r.name : ''), 'font-size:14px;color:#3d3d3d;margin-bottom:18px;'));
+      sheet.appendChild(el('div', '全体の達成度', 'font-size:14px;font-weight:700;color:#3d3d3d;'));
+      sheet.appendChild(el('div', r.totalPct + '%', 'font-size:52px;font-weight:800;color:#2563eb;line-height:1.15;margin-bottom:10px;'));
+      if (chartImage) {
+        const img = document.createElement('img');
+        img.src = chartImage;
+        img.style.cssText = 'display:block;width:420px;max-width:100%;margin:6px auto 14px;';
+        sheet.appendChild(img);
+      }
+      sheet.appendChild(el('div', '軸ごとの達成度', 'font-size:18px;font-weight:700;border-left:4px solid #2563eb;padding-left:10px;margin:16px 0 10px;'));
+      (r.axes || []).forEach((ax) => {
+        const row = el('div', null, 'margin-bottom:9px;');
+        const top = el('div', null, 'display:flex;justify-content:space-between;font-size:15px;font-weight:700;margin-bottom:3px;');
+        top.appendChild(el('span', ax.name, ''));
+        top.appendChild(el('span', ax.pct + '%', ''));
+        row.appendChild(top);
+        const track = el('div', null, 'height:10px;background:#e3e3e1;border-radius:9999px;overflow:hidden;');
+        track.appendChild(el('div', null, 'height:100%;width:' + ax.pct + '%;background:#2563eb;border-radius:9999px;'));
+        row.appendChild(track);
+        sheet.appendChild(row);
+      });
+      sheet.appendChild(el('div', '現在の状態', 'font-size:18px;font-weight:700;border-left:4px solid #2563eb;padding-left:10px;margin:20px 0 8px;'));
+      sheet.appendChild(el('div', r.stateTitle || '', 'font-size:17px;font-weight:700;color:#1d4ed8;margin-bottom:6px;'));
+      sheet.appendChild(el('div', r.stateText || '', 'font-size:14.5px;line-height:1.65;color:#262626;'));
+      sheet.appendChild(el('div', '今後へのアドバイス', 'font-size:18px;font-weight:700;border-left:4px solid #2563eb;padding-left:10px;margin:20px 0 10px;'));
+      (r.advice || []).forEach((ad) => {
+        const box = el('div', null, 'border-left:3px solid #2563eb;padding-left:12px;margin-bottom:12px;');
+        box.appendChild(el('div', ad.axis || '', 'font-size:14px;font-weight:700;margin-bottom:3px;'));
+        box.appendChild(el('div', ad.text || '', 'font-size:14.5px;line-height:1.65;color:#262626;'));
+        sheet.appendChild(box);
+      });
+      sheet.appendChild(el('div', '弱みを埋めるロードマップ', 'font-size:18px;font-weight:700;border-left:4px solid #2563eb;padding-left:10px;margin:20px 0 10px;'));
+      (r.roadmap || []).forEach((rm) => {
+        const box = el('div', null, 'border-left:3px solid #2563eb;padding-left:12px;margin-bottom:14px;');
+        box.appendChild(el('div', '「' + rm.axis + '」（' + rm.pct + '%）を埋める手順', 'font-size:14.5px;font-weight:700;margin-bottom:4px;'));
+        [['今からすぐできること', rm.now], ['先を見据えて少しずつやっていくこと', rm.later]].forEach((pair) => {
+          box.appendChild(el('div', pair[0], 'font-size:13.5px;font-weight:700;color:#1d4ed8;margin:8px 0 3px;'));
+          const ul = document.createElement('ul');
+          ul.style.cssText = 'margin:0;padding-left:20px;';
+          (pair[1] || []).forEach((t) => {
+            ul.appendChild(el('li', t, 'font-size:14.5px;line-height:1.65;color:#262626;margin-bottom:3px;'));
+          });
+          box.appendChild(ul);
+        });
+        sheet.appendChild(box);
+      });
+      return sheet;
+    }
+
+    async function downloadResultPdf() {
+      if (!state.result) return;
+      const btn = $('btn-download');
+      const note = $('download-note');
+      note.textContent = '';
+      if (!window.html2canvas || !window.jspdf || !window.jspdf.jsPDF) {
+        note.textContent = 'PDFを作成できませんでした（通信環境をご確認のうえ、もう一度お試しください）。';
+        return;
+      }
+      btn.disabled = true;
+      const origLabel = btn.textContent;
+      btn.textContent = 'PDFを作成しています…';
+      try {
+        const chartImage = await captureChartImage();
+        const sheet = buildPdfSheet(state.result, chartImage);
+        document.body.appendChild(sheet);
+        let canvas;
+        try {
+          canvas = await html2canvas(sheet, { scale: 2, backgroundColor: '#ffffff' });
+        } finally {
+          sheet.remove();
+        }
+        const jsPDF = window.jspdf.jsPDF;
+        const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+        const margin = 12;
+        const imgW = 210 - margin * 2;
+        const pageContentH = 297 - margin * 2;
+        const pxPerMm = canvas.width / imgW;
+        const slicePx = Math.max(1, Math.floor(pageContentH * pxPerMm));
+        let rendered = 0;
+        let page = 0;
+        while (rendered < canvas.height) {
+          const h = Math.min(slicePx, canvas.height - rendered);
+          const c2 = document.createElement('canvas');
+          c2.width = canvas.width;
+          c2.height = h;
+          const cx2 = c2.getContext('2d');
+          cx2.fillStyle = '#ffffff';
+          cx2.fillRect(0, 0, c2.width, c2.height);
+          cx2.drawImage(canvas, 0, rendered, canvas.width, h, 0, 0, canvas.width, h);
+          if (page > 0) pdf.addPage();
+          pdf.addImage(c2.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, imgW, h / pxPerMm);
+          rendered += h;
+          page++;
+        }
+        const d = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const fname = 'ステップアップ診断結果_' + state.result.role + '_' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '.pdf';
+        pdf.save(fname);
+      } catch (e) {
+        note.textContent = 'PDFを作成できませんでした。通信環境をご確認のうえ、もう一度お試しください。';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = origLabel;
+      }
+    }
+
+    $('btn-download').addEventListener('click', downloadResultPdf);
 
     $('btn-retry').addEventListener('click', () => {
       state.answers = new Array(15).fill(0);
