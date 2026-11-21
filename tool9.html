@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>資材在庫管理（試作）</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; background: #f4f6fb; color: #171717; font-size: 16px; line-height: 1.55; }
+  header { background: #1e3a8a; color: #ffffff; padding: 12px 16px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 20; }
+  header .title { font-size: 19px; font-weight: 800; flex: 1; }
+  .user-chip { background: #2563eb; color: #ffffff; border: 1px solid #93c5fd; border-radius: 9999px; padding: 6px 12px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  nav.tabs { display: flex; background: #ffffff; border-bottom: 2px solid #dbe4ff; position: sticky; top: 53px; z-index: 19; }
+  nav.tabs button { flex: 1; background: none; border: none; border-bottom: 3px solid transparent; padding: 12px 4px; font-size: 16px; font-weight: 700; color: #3d3d3d; cursor: pointer; }
+  nav.tabs button.active { color: #1d4ed8; border-bottom-color: #2563eb; }
+  main { max-width: 760px; margin: 0 auto; padding: 14px 14px 40px; }
+  .card { background: #ffffff; border: 1px solid #d9d9d7; border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  .card h2 { font-size: 17px; font-weight: 800; margin: 0 0 10px 0; border-left: 5px solid #2563eb; padding-left: 9px; }
+  label.f { display: block; font-size: 14px; font-weight: 700; color: #3d3d3d; margin: 10px 0 4px; }
+  input[type="text"], input[type="number"], input[type="date"], select, textarea { width: 100%; font-size: 16px; padding: 10px; border: 1px solid #b9c4d6; border-radius: 8px; background: #ffffff; color: #171717; }
+  textarea { min-height: 64px; resize: vertical; }
+  .btn-primary { background: #2563eb; color: #ffffff; border: none; border-radius: 8px; padding: 11px 16px; font-size: 16px; font-weight: 700; cursor: pointer; width: 100%; margin-top: 12px; }
+  .btn-sub { background: #ffffff; color: #1d4ed8; border: 1.5px solid #2563eb; border-radius: 8px; padding: 8px 12px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .btn-danger { background: #ffffff; color: #b91c1c; border: 1.5px solid #dc2626; border-radius: 8px; padding: 8px 12px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .btn-mini { padding: 5px 10px; font-size: 13.5px; border-radius: 6px; }
+  .row-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .mat-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: #ffffff; border: 1px solid #d9d9d7; border-radius: 10px; padding: 13px 12px; margin-bottom: 9px; cursor: pointer; font-size: 16px; }
+  .mat-row .nm { font-weight: 700; flex: 1; color: #171717; }
+  .mat-row .ct { font-weight: 800; color: #171717; white-space: nowrap; }
+  .badge { border-radius: 9999px; padding: 3px 11px; font-size: 14px; font-weight: 800; white-space: nowrap; }
+  .b-over { background: #2563eb; color: #ffffff; }
+  .b-ok { background: #16a34a; color: #ffffff; }
+  .b-low { background: #facc15; color: #171717; }
+  .b-out { background: #dc2626; color: #ffffff; }
+  .meta { font-size: 13.5px; color: #525252; }
+  .detail-name { font-size: 22px; font-weight: 800; margin: 2px 0 4px; }
+  .big-count { font-size: 40px; font-weight: 800; color: #1d4ed8; line-height: 1.1; }
+  .acc { border: 1px solid #d9d9d7; border-radius: 10px; margin-bottom: 12px; background: #ffffff; overflow: hidden; }
+  .acc-head { width: 100%; background: #eff6ff; border: none; padding: 13px 14px; font-size: 16.5px; font-weight: 800; color: #171717; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+  .acc-body { padding: 12px 14px; display: none; }
+  .acc.open .acc-body { display: block; }
+  .comment { border-bottom: 1px solid #e7e7e4; padding: 9px 0; }
+  .comment:last-child { border-bottom: none; }
+  .comment .c-head { font-size: 13.5px; color: #525252; margin-bottom: 2px; }
+  .comment .c-text { font-size: 15.5px; white-space: pre-wrap; word-break: break-word; }
+  .hist { font-size: 14.5px; padding: 7px 0; border-bottom: 1px solid #e7e7e4; }
+  .hist:last-child { border-bottom: none; }
+  .hist .h-head { font-size: 12.5px; color: #737373; }
+  .hist.red { color: #b91c1c; font-size: 13.5px; }
+  .order-row { border: 1px solid #d9d9d7; border-radius: 10px; padding: 12px; margin-bottom: 10px; background: #ffffff; }
+  .deliver-btn { border: none; border-radius: 8px; padding: 9px 14px; font-size: 15px; font-weight: 800; cursor: pointer; }
+  .deliver-btn.undone { background: #ea580c; color: #ffffff; }
+  .deliver-btn.done { background: #16a34a; color: #ffffff; }
+  .filter-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .filter-row > * { flex: 1; }
+  .back-btn { background: none; border: none; color: #1d4ed8; font-size: 16px; font-weight: 700; cursor: pointer; padding: 6px 0; }
+  .stock-ctl { display: flex; gap: 8px; align-items: center; }
+  .stock-ctl button { width: 52px; height: 48px; font-size: 22px; font-weight: 800; background: #2563eb; color: #ffffff; border: none; border-radius: 8px; cursor: pointer; }
+  .stock-ctl input { text-align: center; font-size: 20px; font-weight: 800; }
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 50; padding: 18px; }
+  .modal-bg.show { display: flex; }
+  .modal { background: #ffffff; border-radius: 12px; padding: 20px; width: 100%; max-width: 420px; }
+  .modal h3 { margin: 0 0 8px; font-size: 18px; font-weight: 800; }
+  .note { font-size: 13.5px; color: #525252; }
+  table.accounts { width: 100%; border-collapse: collapse; font-size: 15px; }
+  table.accounts th, table.accounts td { border-bottom: 1px solid #e7e7e4; padding: 8px 6px; text-align: left; }
+</style>
+</head>
+<body>
+<header>
+  <div class="title">資材在庫管理</div>
+  <button type="button" class="user-chip" id="user-chip">👤 未登録</button>
+</header>
+<nav class="tabs">
+  <button type="button" data-view="stock" class="active">在庫一覧</button>
+  <button type="button" data-view="orders">発注管理</button>
+  <button type="button" data-view="register">登録管理</button>
+  <button type="button" data-view="settings">設定</button>
+</nav>
+<main>
+  <!-- 在庫一覧 -->
+  <section id="view-stock">
+    <div class="filter-row">
+      <input type="text" id="stock-search" placeholder="資材名で検索">
+      <select id="stock-genre"><option value="">全ジャンル</option></select>
+    </div>
+    <div id="stock-list"></div>
+  </section>
+
+  <!-- 資材詳細 -->
+  <section id="view-detail" style="display:none;">
+    <button type="button" class="back-btn" id="btn-back-stock">← 在庫一覧へ戻る</button>
+    <div id="detail-body"></div>
+  </section>
+
+  <!-- 発注管理 -->
+  <section id="view-orders" style="display:none;">
+    <div class="card">
+      <h2>発注を登録</h2>
+      <label class="f">ジャンルで絞り込み</label>
+      <select id="ord-genre"><option value="">全ジャンル</option></select>
+      <label class="f">資材名で検索</label>
+      <input type="text" id="ord-search" placeholder="資材名の一部を入力">
+      <label class="f">資材</label>
+      <select id="ord-material"></select>
+      <label class="f">数量</label>
+      <input type="number" id="ord-qty" min="1" value="1">
+      <label class="f">発注日</label>
+      <input type="date" id="ord-date">
+      <label class="f">発注者</label>
+      <select id="ord-by"></select>
+      <button type="button" class="btn-primary" id="btn-order-add">発注を登録する</button>
+    </div>
+    <div id="order-list"></div>
+  </section>
+
+  <!-- 登録管理 -->
+  <section id="view-register" style="display:none;">
+    <div class="card">
+      <h2>資材を登録</h2>
+      <label class="f">資材名</label>
+      <input type="text" id="reg-name" placeholder="例：サテンリボン 25mm">
+      <label class="f">色</label>
+      <input type="text" id="reg-color" placeholder="例：紺" list="color-list">
+      <datalist id="color-list"></datalist>
+      <label class="f">ジャンル</label>
+      <input type="text" id="reg-genre" placeholder="例：リボン・装飾" list="genre-list">
+      <datalist id="genre-list"></datalist>
+      <label class="f">登録時の在庫数</label>
+      <input type="number" id="reg-count" min="0" value="0">
+      <label class="f">品薄ライン（この数以下で「品薄」）</label>
+      <input type="number" id="reg-low" min="0" value="5">
+      <label class="f">過多ライン（この数以上で「過多」）</label>
+      <input type="number" id="reg-high" min="1" value="30">
+      <label class="f">保管場所（任意・最初の保管場所コメントになります）</label>
+      <input type="text" id="reg-place" placeholder="例：資材棚A-2">
+      <button type="button" class="btn-primary" id="btn-reg-add">登録する</button>
+    </div>
+    <div class="card">
+      <h2>登録済みの資材（登録順）</h2>
+      <div id="reg-list"></div>
+    </div>
+  </section>
+
+  <!-- 設定 -->
+  <section id="view-settings" style="display:none;">
+    <div class="card">
+      <h2>アカウントDB</h2>
+      <p class="note">管理者は「履歴の削除」と「管理者設定の変更」ができます。最初の登録者が自動で管理者になります。</p>
+      <label class="f">新しいアカウント名</label>
+      <input type="text" id="acc-name" placeholder="例：関貴文">
+      <button type="button" class="btn-primary" id="btn-acc-add">アカウントを追加</button>
+      <div style="margin-top:14px;">
+        <table class="accounts"><thead><tr><th>名前</th><th>管理者</th><th></th></tr></thead><tbody id="acc-body"></tbody></table>
+      </div>
+      <label class="f">操作する人（現在のユーザー）</label>
+      <select id="acc-current"></select>
+    </div>
+    <div class="card">
+      <h2>全体の履歴</h2>
+      <div id="global-history"></div>
+    </div>
+    <div class="card">
+      <h2>データ</h2>
+      <p class="note">この試作版のデータは、この端末の中（localStorage）にだけ保存されます。</p>
+      <button type="button" class="btn-danger" id="btn-wipe">全データを初期化（管理者のみ）</button>
+    </div>
+  </section>
+</main>
+
+<!-- 初回アカウント登録モーダル -->
+<div class="modal-bg" id="setup-modal">
+  <div class="modal">
+    <h3>あなたの名前を登録してください</h3>
+    <p class="note">投稿者名・更新者名として表示されます。最初の登録者は自動で管理者になります。</p>
+    <input type="text" id="setup-name" placeholder="例：関貴文">
+    <button type="button" class="btn-primary" id="btn-setup">登録して始める</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ===== データ =====
+const LS_KEY = 'tool9_zaiko_v1';
+const LS_USER = 'tool9_zaiko_user';
+const COALESCE_MS = 10 * 60 * 1000; // 連続編集を1件にまとめる間隔
+const SILENT_EDIT_MS = 24 * 60 * 60 * 1000; // 自分の登録は24時間以内なら編集履歴を残さない
+
+let db = null;
+let currentUserId = localStorage.getItem(LS_USER) || null;
+let currentDetailId = null;
+let currentView = 'stock';
+
+function uid() { return 'id' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function now() { return Date.now(); }
+function save() { localStorage.setItem(LS_KEY, JSON.stringify(db)); }
+function pad(n) { return String(n).padStart(2, '0'); }
+function fmtDateTime(ts) { const d = new Date(ts); return d.getFullYear() + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+function fmtDay(ts) { const d = new Date(ts); return d.getFullYear() + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate()); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+function seed() {
+  const t = now();
+  const mats = [
+    { name: 'フローラルフォーム ブリック', color: '緑', genre: '土台・フォーム', count: 42, low: 10, high: 40 },
+    { name: 'ラッピングペーパー 不織布', color: '白', genre: 'ラッピング', count: 18, low: 10, high: 30 },
+    { name: 'サテンリボン 25mm', color: '紺', genre: 'リボン・装飾', count: 3, low: 5, high: 20 },
+    { name: '供花札（木札）', color: '木目', genre: '札・カード', count: 0, low: 10, high: 100 },
+    { name: 'セロファンロール', color: '透明', genre: 'ラッピング', count: 25, low: 8, high: 30 },
+    { name: '結束バンド 200mm', color: '白', genre: '道具・消耗品', count: 12, low: 20, high: 200 }
+  ];
+  db = { users: [], materials: [], orders: [], comments: [], history: [] };
+  mats.forEach((m, i) => {
+    db.materials.push({ id: uid() + i, name: m.name, color: m.color, genre: m.genre, count: m.count, lowLine: m.low, highLine: m.high, createdAt: t - (mats.length - i) * 60000, createdById: null, createdByName: 'システム', updatedAt: t - 3600000, updatedByName: 'システム' });
+  });
+  const ribon = db.materials[2];
+  db.comments.push({ id: uid() + 'p1', materialId: db.materials[0].id, section: 'place', authorId: null, authorName: 'システム', text: '資材棚A-2', createdAt: t - 3500000, editedAt: null });
+  db.comments.push({ id: uid() + 'p2', materialId: ribon.id, section: 'place', authorId: null, authorName: 'システム', text: '資材棚B-1（リボンケース）', createdAt: t - 3400000, editedAt: null });
+  db.orders.push({ id: uid() + 'o1', materialId: ribon.id, qty: 10, orderDate: fmtDay(t), orderedByName: 'システム', postedById: null, postedByName: 'システム', postedAt: t - 3000000, delivered: false, deliveredAt: null, deliveredByName: null });
+  save();
+}
+function load() {
+  try { db = JSON.parse(localStorage.getItem(LS_KEY)); } catch (e) { db = null; }
+  if (!db || !Array.isArray(db.materials)) seed();
+}
+function userById(id) { return db.users.find((u) => u.id === id) || null; }
+function currentUser() { return userById(currentUserId); }
+function isAdmin() { const u = currentUser(); return !!(u && u.isAdmin); }
+function materialById(id) { return db.materials.find((m) => m.id === id) || null; }
+function statusOf(m) {
+  if (m.count <= 0) return { label: '欠品', cls: 'b-out' };
+  if (m.count <= m.lowLine) return { label: '品薄', cls: 'b-low' };
+  if (m.count >= m.highLine) return { label: '過多', cls: 'b-over' };
+  return { label: '普通', cls: 'b-ok' };
+}
+function canModify(authorId) {
+  const u = currentUser();
+  if (!u) return false;
+  return u.isAdmin || u.id === authorId;
+}
+
+// ===== 履歴 =====
+// type: create/edit/delete/stock/order/deliver/comment。red=true は削除の記録（赤・小さめ、消せるのは管理者のみ）
+function addHistory(materialId, type, text, opts) {
+  opts = opts || {};
+  const u = currentUser();
+  const m = materialById(materialId);
+  const entry = {
+    id: uid(), ts: now(), materialId: materialId || null,
+    materialName: opts.materialName || (m ? m.name : ''),
+    userId: u ? u.id : null, userName: opts.userName || (u ? u.name : 'システム'),
+    type: type, text: text, red: !!opts.red, mergeKey: opts.mergeKey || null,
+    fromText: opts.fromText || null, toText: opts.toText || null
+  };
+  // 連続編集の統合：同じ資材・同じ人・同じ対象の編集が短時間に続いたら1件にまとめる
+  if ((type === 'edit' || type === 'stock') && entry.mergeKey) {
+    const last = db.history[db.history.length - 1];
+    if (last && last.type === type && last.mergeKey === entry.mergeKey && last.materialId === entry.materialId && last.userId === entry.userId && (entry.ts - last.ts) < COALESCE_MS) {
+      last.toText = entry.toText;
+      if (entry.mergeKey.indexOf('stock:') === 0 && last.fromText !== null) {
+        last.text = '在庫数を ' + last.fromText + ' → ' + entry.toText + ' に更新';
+      } else if (entry.mergeKey.indexOf('comment:') === 0 && last.fromText !== null) {
+        last.text = 'コメントを編集：「' + last.fromText + '」→「' + entry.toText + '」';
+      } else {
+        last.text = entry.text;
+      }
+      last.ts = entry.ts;
+      save();
+      return last;
+    }
+  }
+  db.history.push(entry);
+  save();
+  return entry;
+}
+// 編集履歴を残すかどうか（自分の登録を24時間以内に編集した場合は残さない）
+function shouldLogEdit(item) {
+  const u = currentUser();
+  if (!u || !item) return true;
+  const authorId = item.authorId !== undefined ? item.authorId : item.createdById;
+  if (authorId && u.id === authorId && (now() - item.createdAt) < SILENT_EDIT_MS) return false;
+  return true;
+}
+
+// ===== 画面切り替え =====
+const $ = (id) => document.getElementById(id);
+function showView(v) {
+  currentView = v;
+  ['stock', 'detail', 'orders', 'register', 'settings'].forEach((k) => {
+    $('view-' + k).style.display = (k === v) ? '' : 'none';
+  });
+  document.querySelectorAll('nav.tabs button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.view === v || (v === 'detail' && b.dataset.view === 'stock'));
+  });
+  if (v === 'stock') renderStock();
+  if (v === 'orders') renderOrders();
+  if (v === 'register') renderRegister();
+  if (v === 'settings') renderSettings();
+}
+document.querySelectorAll('nav.tabs button').forEach((b) => {
+  b.addEventListener('click', () => showView(b.dataset.view));
+});
+function refreshUserChip() {
+  const u = currentUser();
+  $('user-chip').textContent = '👤 ' + (u ? u.name + (u.isAdmin ? '（管理者）' : '') : '未登録');
+}
+$('user-chip').addEventListener('click', () => showView('settings'));
+
+// ===== 在庫一覧 =====
+function genres() {
+  const s = new Set();
+  db.materials.forEach((m) => { if (m.genre) s.add(m.genre); });
+  return Array.from(s);
+}
+function fillGenreSelect(sel, keep) {
+  const cur = keep ? sel.value : '';
+  sel.innerHTML = '<option value="">全ジャンル</option>' + genres().map((g) => '<option value="' + esc(g) + '">' + esc(g) + '</option>').join('');
+  sel.value = cur;
+}
+function renderStock() {
+  fillGenreSelect($('stock-genre'), true);
+  const q = ($('stock-search').value || '').trim();
+  const g = $('stock-genre').value;
+  const list = db.materials.filter((m) => (!q || m.name.includes(q)) && (!g || m.genre === g));
+  const box = $('stock-list');
+  if (list.length === 0) { box.innerHTML = '<p class="note">該当する資材がありません。</p>'; return; }
+  box.innerHTML = list.map((m) => {
+    const st = statusOf(m);
+    return '<button type="button" class="mat-row" data-mat="' + m.id + '">' +
+      '<span class="nm">' + esc(m.name) + '</span>' +
+      '<span class="ct">残 ' + m.count + '</span>' +
+      '<span class="badge ' + st.cls + '">' + st.label + '</span></button>';
+  }).join('');
+  box.querySelectorAll('[data-mat]').forEach((b) => b.addEventListener('click', () => openDetail(b.dataset.mat)));
+}
+$('stock-search').addEventListener('input', renderStock);
+$('stock-genre').addEventListener('change', renderStock);
+
+// ===== 資材詳細 =====
+let editingCommentId = null;
+function latestPlace(materialId) {
+  const cs = db.comments.filter((c) => c.materialId === materialId && c.section === 'place');
+  if (!cs.length) return '未設定';
+  return cs[cs.length - 1].text;
+}
+function openDetail(id) {
+  currentDetailId = id;
+  editingCommentId = null;
+  showView('detail');
+  renderDetail();
+}
+$('btn-back-stock').addEventListener('click', () => showView('stock'));
+
+function commentHtml(c) {
+  const u = currentUser();
+  const mine = canModify(c.authorId);
+  let h = '<div class="comment" data-cid="' + c.id + '">';
+  h += '<div class="c-head">' + esc(c.authorName) + ' ・ ' + fmtDateTime(c.createdAt) + (c.editedAt ? '（編集済み）' : '') + '</div>';
+  if (editingCommentId === c.id) {
+    h += '<textarea id="edit-ta-' + c.id + '">' + esc(c.text) + '</textarea>' +
+      '<div class="row-btns"><button type="button" class="btn-sub btn-mini" data-act="cedit-save" data-id="' + c.id + '">保存</button>' +
+      '<button type="button" class="btn-sub btn-mini" data-act="cedit-cancel">キャンセル</button></div>';
+  } else {
+    h += '<div class="c-text">' + esc(c.text) + '</div>';
+    if (mine) {
+      h += '<div class="row-btns"><button type="button" class="btn-sub btn-mini" data-act="cedit" data-id="' + c.id + '">編集</button>' +
+        '<button type="button" class="btn-danger btn-mini" data-act="cdel" data-id="' + c.id + '">削除</button></div>';
+    }
+  }
+  return h + '</div>';
+}
+function threadHtml(materialId, section) {
+  const cs = db.comments.filter((c) => c.materialId === materialId && c.section === section);
+  let h = cs.length ? cs.map(commentHtml).join('') : '<p class="note">まだコメントはありません。</p>';
+  h += '<textarea id="ta-' + section + '" placeholder="コメントを書く"></textarea>' +
+    '<button type="button" class="btn-primary" data-act="cpost" data-section="' + section + '">投稿する</button>';
+  return h;
+}
+function historyHtml(materialId) {
+  const hs = db.history.filter((x) => x.materialId === materialId).slice().reverse();
+  if (!hs.length) return '<p class="note">履歴はまだありません。</p>';
+  return hs.map((x) => {
+    let h = '<div class="hist' + (x.red ? ' red' : '') + '"><div class="h-head">' + fmtDateTime(x.ts) + ' ・ ' + esc(x.userName) + '</div>' + esc(x.text);
+    if (isAdmin()) h += ' <button type="button" class="btn-danger btn-mini" data-act="hdel" data-id="' + x.id + '">この履歴を消す</button>';
+    return h + '</div>';
+  }).join('');
+}
+function renderDetail() {
+  const m = materialById(currentDetailId);
+  if (!m) { showView('stock'); return; }
+  const st = statusOf(m);
+  const orders = db.orders.filter((o) => o.materialId === m.id).slice().reverse();
+  const ordersHtml = orders.length ? orders.map((o) =>
+    '<div class="hist"><div class="h-head">' + esc(o.orderDate) + ' ・ 発注者：' + esc(o.orderedByName) + ' ・ 投稿：' + esc(o.postedByName) + '</div>' +
+    o.qty + '個 ・ ' + (o.delivered ? '納品済み（' + fmtDay(o.deliveredAt) + '）' : '未納品') + '</div>').join('')
+    : '<p class="note">この資材の発注はまだありません。</p>';
+  const mine = canModify(m.createdById);
+  $('detail-body').innerHTML =
+    '<div class="card">' +
+      '<div class="detail-name">' + esc(m.name) + ' <span class="badge ' + st.cls + '">' + st.label + '</span></div>' +
+      '<div class="meta">色：' + esc(m.color || '—') + '　ジャンル：' + esc(m.genre || '—') + '</div>' +
+      '<div style="margin-top:10px;" class="meta">残り数</div>' +
+      '<div class="big-count">' + m.count + '</div>' +
+      '<div class="meta">更新日：' + fmtDateTime(m.updatedAt) + '　更新者：' + esc(m.updatedByName || '—') + '</div>' +
+      '<div class="meta" style="margin-top:4px;">保管場所：' + esc(latestPlace(m.id)) + '</div>' +
+      '<label class="f">在庫数を更新</label>' +
+      '<div class="stock-ctl"><button type="button" id="stk-minus">−</button><input type="number" id="stk-input" value="' + m.count + '" min="0"><button type="button" id="stk-plus">＋</button></div>' +
+      '<button type="button" class="btn-primary" id="stk-save">在庫数を保存</button>' +
+      (mine ? '<div class="row-btns"><button type="button" class="btn-sub" id="mat-edit">資材情報を編集</button><button type="button" class="btn-danger" id="mat-del">この資材を削除</button></div>' : '') +
+    '</div>' +
+    '<div class="acc" id="acc-order"><button type="button" class="acc-head" data-acc="acc-order">発注・数量 <span>▾</span></button><div class="acc-body">' + ordersHtml + '<hr style="border:none;border-top:1px solid #e7e7e4;margin:10px 0;">' + threadHtml(m.id, 'order') + '</div></div>' +
+    '<div class="acc" id="acc-place"><button type="button" class="acc-head" data-acc="acc-place">保管場所 <span>▾</span></button><div class="acc-body">' + threadHtml(m.id, 'place') + '</div></div>' +
+    '<div class="card"><h2>コメント</h2>' + threadHtml(m.id, 'general') + '</div>' +
+    '<div class="acc" id="acc-hist"><button type="button" class="acc-head" data-acc="acc-hist">履歴 <span>▾</span></button><div class="acc-body">' + historyHtml(m.id) + '</div></div>';
+
+  document.querySelectorAll('[data-acc]').forEach((b) => b.addEventListener('click', () => {
+    document.getElementById(b.dataset.acc).classList.toggle('open');
+  }));
+  $('stk-minus').addEventListener('click', () => { const i = $('stk-input'); i.value = Math.max(0, (parseInt(i.value, 10) || 0) - 1); });
+  $('stk-plus').addEventListener('click', () => { const i = $('stk-input'); i.value = (parseInt(i.value, 10) || 0) + 1; });
+  $('stk-save').addEventListener('click', () => {
+    const v = Math.max(0, parseInt($('stk-input').value, 10) || 0);
+    if (v === m.count) return;
+    const u = currentUser();
+    const from = m.count;
+    m.count = v;
+    m.updatedAt = now();
+    m.updatedByName = u ? u.name : '—';
+    addHistory(m.id, 'stock', '在庫数を ' + from + ' → ' + v + ' に更新', { mergeKey: 'stock:' + m.id, fromText: String(from), toText: String(v) });
+    save();
+    renderDetail();
+  });
+  if (mine) {
+    $('mat-del').addEventListener('click', () => {
+      if (!confirm('「' + m.name + '」を削除しますか？（履歴には削除の記録が残ります）')) return;
+      addHistory(m.id, 'delete', '資材「' + m.name + '」を削除', { red: true, materialName: m.name });
+      db.materials = db.materials.filter((x) => x.id !== m.id);
+      db.comments = db.comments.filter((x) => x.materialId !== m.id);
+      db.orders = db.orders.filter((x) => x.materialId !== m.id);
+      save();
+      showView('stock');
+    });
+    $('mat-edit').addEventListener('click', () => editMaterial(m));
+  }
+  // コメント操作（イベント委譲）
+  $('detail-body').querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => handleCommentAction(b, m)));
+}
+function handleCommentAction(b, m) {
+  const act = b.dataset.act;
+  const u = currentUser();
+  if (act === 'cpost') {
+    if (!u) { alert('先にアカウントを登録してください'); showView('settings'); return; }
+    const section = b.dataset.section;
+    const ta = $('ta-' + section);
+    const text = (ta.value || '').trim();
+    if (!text) return;
+    db.comments.push({ id: uid(), materialId: m.id, section: section, authorId: u.id, authorName: u.name, text: text, createdAt: now(), editedAt: null });
+    addHistory(m.id, 'comment', 'コメントを投稿（' + ({ order: '発注・数量', place: '保管場所', general: 'コメント' }[section]) + '）：「' + text + '」');
+    save();
+    renderDetail();
+    const acc = document.getElementById(section === 'order' ? 'acc-order' : section === 'place' ? 'acc-place' : '');
+    if (acc) acc.classList.add('open');
+  }
+  if (act === 'cedit') { editingCommentId = b.dataset.id; renderDetail(); keepAccordionsOpen(); }
+  if (act === 'cedit-cancel') { editingCommentId = null; renderDetail(); keepAccordionsOpen(); }
+  if (act === 'cedit-save') {
+    const c = db.comments.find((x) => x.id === b.dataset.id);
+    if (!c) return;
+    const ta = $('edit-ta-' + c.id);
+    const text = (ta.value || '').trim();
+    if (!text || text === c.text) { editingCommentId = null; renderDetail(); keepAccordionsOpen(); return; }
+    const old = c.text;
+    c.text = text;
+    c.editedAt = now();
+    editingCommentId = null;
+    if (shouldLogEdit(c)) {
+      addHistory(m.id, 'edit', 'コメントを編集：「' + old + '」→「' + text + '」', { mergeKey: 'comment:' + c.id, fromText: old, toText: text });
+    }
+    save();
+    renderDetail();
+    keepAccordionsOpen();
+  }
+  if (act === 'cdel') {
+    const c = db.comments.find((x) => x.id === b.dataset.id);
+    if (!c) return;
+    if (!confirm('このコメントを削除しますか？（履歴には赤字で残ります）')) return;
+    addHistory(m.id, 'delete', 'コメントを削除：「' + c.text + '」（投稿者：' + c.authorName + '）', { red: true });
+    db.comments = db.comments.filter((x) => x.id !== c.id);
+    save();
+    renderDetail();
+    keepAccordionsOpen();
+  }
+  if (act === 'hdel') {
+    if (!isAdmin()) return;
+    if (!confirm('この履歴を削除しますか？（管理者のみ可能）')) return;
+    db.history = db.history.filter((x) => x.id !== b.dataset.id);
+    save();
+    renderDetail();
+    document.getElementById('acc-hist').classList.add('open');
+  }
+}
+function keepAccordionsOpen() {
+  // 再描画後も、コメントのあるアコーディオンは開いたままにする
+  ['acc-order', 'acc-place'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('open');
+  });
+}
+function editMaterial(m) {
+  const name = prompt('資材名', m.name);
+  if (name === null) return;
+  const color = prompt('色', m.color || '');
+  if (color === null) return;
+  const genre = prompt('ジャンル', m.genre || '');
+  if (genre === null) return;
+  const low = prompt('品薄ライン（この数以下で品薄）', m.lowLine);
+  if (low === null) return;
+  const high = prompt('過多ライン（この数以上で過多）', m.highLine);
+  if (high === null) return;
+  const changes = [];
+  if (name.trim() && name.trim() !== m.name) changes.push('名前「' + m.name + '」→「' + name.trim() + '」');
+  if (color !== m.color) changes.push('色「' + (m.color || '—') + '」→「' + color + '」');
+  if (genre !== m.genre) changes.push('ジャンル「' + (m.genre || '—') + '」→「' + genre + '」');
+  if (parseInt(low, 10) !== m.lowLine) changes.push('品薄ライン ' + m.lowLine + '→' + parseInt(low, 10));
+  if (parseInt(high, 10) !== m.highLine) changes.push('過多ライン ' + m.highLine + '→' + parseInt(high, 10));
+  if (!changes.length) return;
+  const rec = { createdAt: m.createdAt, createdById: m.createdById, authorId: m.createdById };
+  m.name = name.trim() || m.name;
+  m.color = color; m.genre = genre;
+  m.lowLine = Math.max(0, parseInt(low, 10) || 0);
+  m.highLine = Math.max(1, parseInt(high, 10) || 1);
+  if (shouldLogEdit(rec)) {
+    addHistory(m.id, 'edit', '資材情報を編集：' + changes.join('、'), { mergeKey: 'material:' + m.id, fromText: changes.join('、'), toText: changes.join('、') });
+  }
+  save();
+  renderDetail();
+}
+
+// ===== 発注管理 =====
+function fillOrderMaterials() {
+  const g = $('ord-genre').value;
+  const q = ($('ord-search').value || '').trim();
+  const list = db.materials.filter((m) => (!g || m.genre === g) && (!q || m.name.includes(q)));
+  $('ord-material').innerHTML = list.map((m) => '<option value="' + m.id + '">' + esc(m.name) + '（残 ' + m.count + '）</option>').join('') || '<option value="">該当する資材がありません</option>';
+}
+function renderOrders() {
+  fillGenreSelect($('ord-genre'), true);
+  fillOrderMaterials();
+  const u = currentUser();
+  $('ord-by').innerHTML = db.users.map((x) => '<option value="' + esc(x.name) + '"' + (u && x.id === u.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') || '<option value="">（アカウント未登録）</option>';
+  if (!$('ord-date').value) $('ord-date').value = fmtDay(now()).replace(/\//g, '-');
+  const orders = db.orders.slice().sort((a, b) => (a.delivered - b.delivered) || (b.postedAt - a.postedAt));
+  const box = $('order-list');
+  if (!orders.length) { box.innerHTML = '<p class="note">発注はまだありません。</p>'; return; }
+  box.innerHTML = orders.map((o) => {
+    const m = materialById(o.materialId);
+    const mine = canModify(o.postedById);
+    return '<div class="order-row">' +
+      '<div style="font-weight:800;font-size:17px;">' + esc(m ? m.name : '（削除された資材）') + ' × ' + o.qty + '</div>' +
+      '<div class="meta">発注日：' + esc(o.orderDate) + '　発注者：' + esc(o.orderedByName) + '</div>' +
+      '<div class="meta">投稿者：' + esc(o.postedByName) + '　投稿日：' + fmtDateTime(o.postedAt) + '</div>' +
+      (o.delivered ? '<div class="meta">納品日：' + fmtDay(o.deliveredAt) + '　納品処理：' + esc(o.deliveredByName || '—') + '</div>' : '') +
+      '<div class="row-btns">' +
+        '<button type="button" class="deliver-btn ' + (o.delivered ? 'done' : 'undone') + '" data-act="deliver" data-id="' + o.id + '">' + (o.delivered ? '納品済み' : '未納品（タップで納品済みに）') + '</button>' +
+        (mine ? '<button type="button" class="btn-sub" data-act="oedit" data-id="' + o.id + '">編集</button><button type="button" class="btn-danger" data-act="odel" data-id="' + o.id + '">削除</button>' : '') +
+      '</div></div>';
+  }).join('');
+  box.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => handleOrderAction(b)));
+}
+$('ord-genre').addEventListener('change', fillOrderMaterials);
+$('ord-search').addEventListener('input', fillOrderMaterials);
+$('btn-order-add').addEventListener('click', () => {
+  const u = currentUser();
+  if (!u) { alert('先にアカウントを登録してください'); showView('settings'); return; }
+  const mid = $('ord-material').value;
+  const m = materialById(mid);
+  const qty = parseInt($('ord-qty').value, 10);
+  const date = $('ord-date').value;
+  const by = $('ord-by').value || u.name;
+  if (!m) { alert('資材を選んでください'); return; }
+  if (!qty || qty < 1) { alert('数量を入れてください'); return; }
+  if (!date) { alert('発注日を選んでください'); return; }
+  db.orders.push({ id: uid(), materialId: m.id, qty: qty, orderDate: date.replace(/-/g, '/'), orderedByName: by, postedById: u.id, postedByName: u.name, postedAt: now(), delivered: false, deliveredAt: null, deliveredByName: null });
+  addHistory(m.id, 'order', '発注を登録：' + qty + '個（発注日 ' + date.replace(/-/g, '/') + '、発注者 ' + by + '）');
+  save();
+  renderOrders();
+});
+function handleOrderAction(b) {
+  const o = db.orders.find((x) => x.id === b.dataset.id);
+  if (!o) return;
+  const m = materialById(o.materialId);
+  const u = currentUser();
+  if (b.dataset.act === 'deliver') {
+    if (!u) { alert('先にアカウントを登録してください'); showView('settings'); return; }
+    if (!o.delivered) {
+      o.delivered = true; o.deliveredAt = now(); o.deliveredByName = u.name;
+      if (m) {
+        m.count += o.qty;
+        m.updatedAt = now(); m.updatedByName = u.name;
+        addHistory(m.id, 'deliver', '納品済み：在庫に ' + o.qty + '個を反映（残 ' + m.count + '）');
+      }
+    } else {
+      o.delivered = false; o.deliveredAt = null; o.deliveredByName = null;
+      if (m) {
+        m.count = Math.max(0, m.count - o.qty);
+        m.updatedAt = now(); m.updatedByName = u.name;
+        addHistory(m.id, 'deliver', '未納品に戻した：在庫から ' + o.qty + '個を差し戻し（残 ' + m.count + '）');
+      }
+    }
+    save();
+    renderOrders();
+  }
+  if (b.dataset.act === 'odel') {
+    if (!confirm('この発注を削除しますか？（履歴には赤字で残ります）')) return;
+    if (o.delivered && m) { m.count = Math.max(0, m.count - o.qty); m.updatedAt = now(); }
+    if (m) addHistory(m.id, 'delete', '発注を削除：' + o.qty + '個（発注者 ' + o.orderedByName + '、投稿者 ' + o.postedByName + '）' + (o.delivered ? ' ※納品済みだったため在庫から差し戻し' : ''), { red: true });
+    db.orders = db.orders.filter((x) => x.id !== o.id);
+    save();
+    renderOrders();
+  }
+  if (b.dataset.act === 'oedit') {
+    const qty = prompt('数量', o.qty);
+    if (qty === null) return;
+    const date = prompt('発注日（YYYY/MM/DD）', o.orderDate);
+    if (date === null) return;
+    const by = prompt('発注者', o.orderedByName);
+    if (by === null) return;
+    const nq = Math.max(1, parseInt(qty, 10) || o.qty);
+    const changes = [];
+    if (nq !== o.qty) changes.push('数量 ' + o.qty + '→' + nq);
+    if (date !== o.orderDate) changes.push('発注日 ' + o.orderDate + '→' + date);
+    if (by !== o.orderedByName) changes.push('発注者 ' + o.orderedByName + '→' + by);
+    if (!changes.length) return;
+    if (o.delivered && m && nq !== o.qty) { m.count = Math.max(0, m.count + (nq - o.qty)); m.updatedAt = now(); }
+    const rec = { createdAt: o.postedAt, authorId: o.postedById };
+    o.qty = nq; o.orderDate = date; o.orderedByName = by;
+    if (m && shouldLogEdit(rec)) addHistory(m.id, 'edit', '発注を編集：' + changes.join('、'), { mergeKey: 'order:' + o.id, fromText: changes.join('、'), toText: changes.join('、') });
+    save();
+    renderOrders();
+  }
+}
+
+// ===== 登録管理 =====
+function renderRegister() {
+  $('genre-list').innerHTML = genres().map((g) => '<option value="' + esc(g) + '">').join('');
+  const colors = new Set();
+  db.materials.forEach((m) => { if (m.color) colors.add(m.color); });
+  $('color-list').innerHTML = Array.from(colors).map((c) => '<option value="' + esc(c) + '">').join('');
+  const box = $('reg-list');
+  if (!db.materials.length) { box.innerHTML = '<p class="note">登録済みの資材はありません。</p>'; return; }
+  box.innerHTML = db.materials.map((m) => {
+    const st = statusOf(m);
+    const mine = canModify(m.createdById);
+    return '<div class="order-row"><div style="font-weight:800;">' + esc(m.name) + ' <span class="badge ' + st.cls + '">' + st.label + '</span></div>' +
+      '<div class="meta">色：' + esc(m.color || '—') + '　ジャンル：' + esc(m.genre || '—') + '　残 ' + m.count + '</div>' +
+      '<div class="meta">登録：' + fmtDateTime(m.createdAt) + '　登録者：' + esc(m.createdByName || '—') + '</div>' +
+      (mine ? '<div class="row-btns"><button type="button" class="btn-sub btn-mini" data-ract="edit" data-id="' + m.id + '">編集</button><button type="button" class="btn-danger btn-mini" data-ract="del" data-id="' + m.id + '">削除</button></div>' : '') +
+      '</div>';
+  }).join('');
+  box.querySelectorAll('[data-ract]').forEach((b) => b.addEventListener('click', () => {
+    const m = materialById(b.dataset.id);
+    if (!m) return;
+    if (b.dataset.ract === 'del') {
+      if (!confirm('「' + m.name + '」を削除しますか？（履歴には削除の記録が残ります）')) return;
+      addHistory(m.id, 'delete', '資材「' + m.name + '」を削除', { red: true, materialName: m.name });
+      db.materials = db.materials.filter((x) => x.id !== m.id);
+      db.comments = db.comments.filter((x) => x.materialId !== m.id);
+      db.orders = db.orders.filter((x) => x.materialId !== m.id);
+      save();
+      renderRegister();
+    } else {
+      currentDetailId = m.id;
+      editMaterial(m);
+      renderRegister();
+    }
+  }));
+}
+$('btn-reg-add').addEventListener('click', () => {
+  const u = currentUser();
+  if (!u) { alert('先にアカウントを登録してください'); showView('settings'); return; }
+  const name = ($('reg-name').value || '').trim();
+  if (!name) { alert('資材名を入れてください'); return; }
+  const m = {
+    id: uid(), name: name, color: ($('reg-color').value || '').trim(), genre: ($('reg-genre').value || '').trim(),
+    count: Math.max(0, parseInt($('reg-count').value, 10) || 0),
+    lowLine: Math.max(0, parseInt($('reg-low').value, 10) || 0),
+    highLine: Math.max(1, parseInt($('reg-high').value, 10) || 1),
+    createdAt: now(), createdById: u.id, createdByName: u.name, updatedAt: now(), updatedByName: u.name
+  };
+  db.materials.push(m);
+  addHistory(m.id, 'create', '資材「' + m.name + '」を登録（初期在庫 ' + m.count + '）', { materialName: m.name });
+  const place = ($('reg-place').value || '').trim();
+  if (place) db.comments.push({ id: uid(), materialId: m.id, section: 'place', authorId: u.id, authorName: u.name, text: place, createdAt: now(), editedAt: null });
+  save();
+  $('reg-name').value = ''; $('reg-color').value = ''; $('reg-genre').value = ''; $('reg-count').value = 0; $('reg-place').value = '';
+  renderRegister();
+});
+
+// ===== 設定（アカウントDB・全体履歴） =====
+function renderSettings() {
+  refreshUserChip();
+  const u = currentUser();
+  $('acc-current').innerHTML = db.users.map((x) => '<option value="' + x.id + '"' + (u && x.id === u.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') || '<option value="">（未登録）</option>';
+  const adminExists = db.users.some((x) => x.isAdmin);
+  $('acc-body').innerHTML = db.users.map((x) => {
+    const canToggle = isAdmin() || !adminExists;
+    return '<tr><td>' + esc(x.name) + (u && x.id === u.id ? '（現在のユーザー）' : '') + '</td>' +
+      '<td><input type="checkbox" data-admin="' + x.id + '"' + (x.isAdmin ? ' checked' : '') + (canToggle ? '' : ' disabled') + ' style="width:22px;height:22px;"></td>' +
+      '<td>' + (isAdmin() && (!u || x.id !== u.id) ? '<button type="button" class="btn-danger btn-mini" data-udel="' + x.id + '">削除</button>' : '') + '</td></tr>';
+  }).join('') || '<tr><td colspan="3" class="note">アカウントがありません</td></tr>';
+  $('acc-body').querySelectorAll('[data-admin]').forEach((cb) => cb.addEventListener('change', () => {
+    const target = userById(cb.dataset.admin);
+    if (!target) return;
+    if (!cb.checked && target.isAdmin && db.users.filter((x) => x.isAdmin).length <= 1) { alert('管理者が最低1人必要です'); cb.checked = true; return; }
+    target.isAdmin = cb.checked;
+    save();
+    renderSettings();
+  }));
+  $('acc-body').querySelectorAll('[data-udel]').forEach((b) => b.addEventListener('click', () => {
+    const target = userById(b.dataset.udel);
+    if (!target) return;
+    if (target.isAdmin && db.users.filter((x) => x.isAdmin).length <= 1) { alert('最後の管理者は削除できません'); return; }
+    if (!confirm('アカウント「' + target.name + '」を削除しますか？（過去の投稿は名前が残ります）')) return;
+    db.users = db.users.filter((x) => x.id !== target.id);
+    save();
+    renderSettings();
+  }));
+  const hs = db.history.slice().reverse();
+  $('global-history').innerHTML = hs.length ? hs.map((x) =>
+    '<div class="hist' + (x.red ? ' red' : '') + '"><div class="h-head">' + fmtDateTime(x.ts) + ' ・ ' + esc(x.userName) + ' ・ ' + esc(x.materialName || '') + '</div>' + esc(x.text) +
+    (isAdmin() ? ' <button type="button" class="btn-danger btn-mini" data-ghdel="' + x.id + '">この履歴を消す</button>' : '') + '</div>').join('')
+    : '<p class="note">履歴はまだありません。</p>';
+  $('global-history').querySelectorAll('[data-ghdel]').forEach((b) => b.addEventListener('click', () => {
+    if (!confirm('この履歴を削除しますか？（管理者のみ可能）')) return;
+    db.history = db.history.filter((x) => x.id !== b.dataset.ghdel);
+    save();
+    renderSettings();
+  }));
+}
+$('btn-acc-add').addEventListener('click', () => {
+  const name = ($('acc-name').value || '').trim();
+  if (!name) { alert('名前を入れてください'); return; }
+  const nu = { id: uid(), name: name, isAdmin: db.users.length === 0 };
+  db.users.push(nu);
+  if (!currentUser()) { currentUserId = nu.id; localStorage.setItem(LS_USER, nu.id); }
+  save();
+  $('acc-name').value = '';
+  renderSettings();
+});
+$('acc-current').addEventListener('change', () => {
+  currentUserId = $('acc-current').value || null;
+  if (currentUserId) localStorage.setItem(LS_USER, currentUserId); else localStorage.removeItem(LS_USER);
+  renderSettings();
+});
+$('btn-wipe').addEventListener('click', () => {
+  if (!isAdmin()) { alert('初期化は管理者のみ可能です'); return; }
+  if (!confirm('全データを初期化しますか？（元に戻せません）')) return;
+  if (!confirm('本当に初期化しますか？')) return;
+  localStorage.removeItem(LS_KEY);
+  localStorage.removeItem(LS_USER);
+  currentUserId = null;
+  seed();
+  showSetupIfNeeded();
+  showView('stock');
+});
+
+// ===== 初回セットアップ・初期化 =====
+function showSetupIfNeeded() {
+  $('setup-modal').classList.toggle('show', db.users.length === 0);
+}
+$('btn-setup').addEventListener('click', () => {
+  const name = ($('setup-name').value || '').trim();
+  if (!name) { alert('名前を入れてください'); return; }
+  const nu = { id: uid(), name: name, isAdmin: true };
+  db.users.push(nu);
+  currentUserId = nu.id;
+  localStorage.setItem(LS_USER, nu.id);
+  save();
+  $('setup-modal').classList.remove('show');
+  refreshUserChip();
+  showView('stock');
+});
+load();
+if (currentUserId && !userById(currentUserId)) { currentUserId = null; localStorage.removeItem(LS_USER); }
+refreshUserChip();
+showSetupIfNeeded();
+showView('stock');
+
+</script>
+</body>
+</html>
