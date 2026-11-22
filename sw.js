@@ -1,5 +1,5 @@
 // sw.js (テストルーム)
-const CACHE_NAME = 'test-room-v9';
+const CACHE_NAME = 'test-room-v10';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -9,7 +9,8 @@ const ASSETS_TO_CACHE = [
   './tool7.html',
   './tool8.html',
   './stepup.html',
-  './tool9.html'
+  './tool9.html',
+  './mono.html'
 ];
 
 self.addEventListener('install', (event) => {
