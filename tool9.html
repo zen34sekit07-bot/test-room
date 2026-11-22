@@ -185,6 +185,36 @@
       <button type="button" class="mat-row" data-goto="setcomments"><span class="nm">コメント管理</span><span>›</span></button>
       <button type="button" class="mat-row" data-goto="sethistory"><span class="nm">履歴管理</span><span>›</span></button>
     </div>
+    <div class="card">
+      <h2>クレジット</h2>
+      <div class="credits-box"></div>
+    </div>
+    <div class="card">
+      <h2>更新履歴</h2>
+      <div class="changelog-box"></div>
+    </div>
+  </section>
+
+  <!-- 一般アカウント向け設定 -->
+  <section id="view-usersettings" style="display:none;">
+    <div class="card">
+      <h2>自分の設定</h2>
+      <label class="f">名前</label>
+      <input type="text" id="us-name">
+      <button type="button" class="btn-primary" id="us-name-save">名前を変更する</button>
+      <label class="f">拠点</label>
+      <select id="us-branch"></select>
+      <button type="button" class="btn-primary" id="us-branch-save">拠点を変更する</button>
+      <p class="note">名前を変えても、過去の投稿に表示される名前はそのまま残ります。</p>
+    </div>
+    <div class="card">
+      <h2>クレジット</h2>
+      <div class="credits-box"></div>
+    </div>
+    <div class="card">
+      <h2>更新履歴</h2>
+      <div class="changelog-box"></div>
+    </div>
   </section>
 
   <!-- アカウント管理（設定内） -->
@@ -195,12 +225,20 @@
       <p class="note">管理者は「履歴の削除」と「管理者設定の変更」ができます。最初の登録者が自動で管理者になります。</p>
       <label class="f">新しいアカウント名</label>
       <input type="text" id="acc-name" placeholder="例：関貴文">
+      <label class="f">拠点</label>
+      <select id="acc-branch"></select>
       <button type="button" class="btn-primary" id="btn-acc-add">アカウントを追加</button>
       <div style="margin-top:14px;">
-        <table class="accounts"><thead><tr><th>名前</th><th>管理者</th><th></th></tr></thead><tbody id="acc-body"></tbody></table>
+        <table class="accounts"><thead><tr><th>名前</th><th>拠点</th><th>管理者</th><th></th></tr></thead><tbody id="acc-body"></tbody></table>
       </div>
       <label class="f">操作する人（現在のユーザー）</label>
       <select id="acc-current"></select>
+    </div>
+    <div class="card">
+      <h2>拠点マスター</h2>
+      <p class="note">アカウント登録で選べる拠点の一覧です。名前を変えると、アカウントの拠点も連動して変わります。</p>
+      <div class="filter-row"><input type="text" id="br-name" placeholder="新しい拠点名"><button type="button" class="btn-sub" id="br-add" style="flex:0 0 84px;">追加</button></div>
+      <div id="br-list"></div>
     </div>
     <div class="card">
       <h2>データ</h2>
@@ -235,6 +273,8 @@
     <h3>あなたの名前を登録してください</h3>
     <p class="note">投稿者名・更新者名として表示されます。最初の登録者は自動で管理者になります。</p>
     <input type="text" id="setup-name" placeholder="例：関貴文">
+    <label class="f">拠点</label>
+    <select id="setup-branch"></select>
     <button type="button" class="btn-primary" id="btn-setup">登録して始める</button>
   </div>
 </div>
@@ -270,7 +310,7 @@ function seed() {
     { name: 'セロファンロール', color: '透明', genre: 'ラッピング', count: 25, low: 8, high: 30 },
     { name: '結束バンド 200mm', color: '白', genre: '道具・消耗品', count: 12, low: 20, high: 200 }
   ];
-  db = { users: [], materials: [], orders: [], comments: [], history: [], masters: null };
+  db = { users: [], materials: [], orders: [], comments: [], history: [], masters: null, branches: ['所沢支店'] };
   db.masters = {
     genres: ['土台・フォーム', 'ラッピング', 'リボン・装飾', '札・カード', '道具・消耗品'],
     colors: ['緑', '白', '紺', '木目', '透明'],
@@ -303,6 +343,8 @@ function load() {
     db.masters = { genres: Array.from(g), colors: Array.from(c), places: Array.from(p), items: items };
     save();
   }
+  if (!Array.isArray(db.branches)) { db.branches = ['所沢支店']; save(); }
+  db.users.forEach((u) => { if (u.branch === undefined) u.branch = ''; });
 }
 function userById(id) { return db.users.find((u) => u.id === id) || null; }
 function currentUser() { return userById(currentUserId); }
@@ -365,18 +407,21 @@ function shouldLogEdit(item) {
 
 // ===== 画面切り替え =====
 const $ = (id) => document.getElementById(id);
-const SETTINGS_VIEWS = ['settings', 'setreg', 'setmaster', 'setaccount', 'setcomments', 'sethistory'];
+const ADMIN_VIEWS = ['setreg', 'setmaster', 'setaccount', 'setcomments', 'sethistory'];
 function showView(v) {
-  if (SETTINGS_VIEWS.includes(v) && !isAdmin()) v = 'stock'; // 設定内は管理者専用
+  if (v === 'settings') v = isAdmin() ? 'settings' : 'usersettings'; // 管理者は管理ハブ、一般は自分の設定
+  if (ADMIN_VIEWS.includes(v) && !isAdmin()) v = 'stock'; // 管理画面は管理者専用
   currentView = v;
-  ['stock', 'detail', 'orders', 'settings', 'setreg', 'setmaster', 'setaccount', 'setcomments', 'sethistory'].forEach((k) => {
+  ['stock', 'detail', 'orders', 'settings', 'usersettings', 'setreg', 'setmaster', 'setaccount', 'setcomments', 'sethistory'].forEach((k) => {
     $('view-' + k).style.display = (k === v) ? '' : 'none';
   });
   document.querySelectorAll('nav.tabs button').forEach((b) => {
-    b.classList.toggle('active', b.dataset.view === v || (v === 'detail' && b.dataset.view === 'stock') || (SETTINGS_VIEWS.includes(v) && b.dataset.view === 'settings'));
+    b.classList.toggle('active', b.dataset.view === v || (v === 'detail' && b.dataset.view === 'stock') || ((v === 'settings' || v === 'usersettings' || ADMIN_VIEWS.includes(v)) && b.dataset.view === 'settings'));
   });
   if (v === 'stock') renderStock();
   if (v === 'orders') renderOrders();
+  if (v === 'settings') fillCredits();
+  if (v === 'usersettings') renderUserSettings();
   if (v === 'setreg') renderRegister();
   if (v === 'setmaster') renderMasters();
   if (v === 'setaccount') renderSetAccount();
@@ -391,11 +436,49 @@ document.querySelectorAll('[data-back-settings]').forEach((b) => b.addEventListe
 function refreshUserChip() {
   const u = currentUser();
   $('user-chip').textContent = '👤 ' + (u ? u.name + (u.isAdmin ? '（管理者）' : '') : '未登録');
-  $('tab-settings').style.display = isAdmin() ? '' : 'none';
 }
-$('user-chip').addEventListener('click', () => {
-  if (isAdmin()) showView('settings');
-  else alert('設定は管理者専用です');
+$('user-chip').addEventListener('click', () => showView('settings'));
+// ===== クレジット・更新履歴 =====
+const CHANGELOG = [
+  { date: '2026/11/22', text: '拠点管理を追加。アカウントに拠点を持たせ、一般アカウント向け設定（名前・拠点の変更）を追加' },
+  { date: '2026/11/22', text: '設定を管理者用ハブに再編（新規在庫登録・資材マスター登録・アカウント管理・コメント管理・履歴管理）。タブは権限別表示に' },
+  { date: '2026/11/22', text: '在庫登録をプルダウン式に変更し、資材マスター登録を追加（表記ゆれ防止）' },
+  { date: '2026/11/22', text: '資材在庫管理ツールを公開（在庫一覧・発注管理・コメント・履歴）' }
+];
+function fillCredits() {
+  document.querySelectorAll('.credits-box').forEach((el) => {
+    el.innerHTML = '<p style="margin:4px 0;">資材在庫管理ツール（試作版）</p>' +
+      '<p style="margin:4px 0;">制作：関貴文（株式会社ユー花園 所沢支店 施工課）</p>' +
+      '<p style="margin:4px 0;">開発支援：Gemini (Google) / Muse (Meta)</p>';
+  });
+  document.querySelectorAll('.changelog-box').forEach((el) => {
+    el.innerHTML = CHANGELOG.map((c) => '<div class="hist"><div class="h-head">' + c.date + '</div>' + esc(c.text) + '</div>').join('');
+  });
+}
+// ===== 一般アカウント向け設定 =====
+function renderUserSettings() {
+  fillCredits();
+  const u = currentUser();
+  if (!u) return;
+  $('us-name').value = u.name;
+  $('us-branch').innerHTML = '<option value="">未設定</option>' + db.branches.map((b) => '<option value="' + esc(b) + '"' + (u.branch === b ? ' selected' : '') + '>' + esc(b) + '</option>').join('');
+}
+$('us-name-save').addEventListener('click', () => {
+  const u = currentUser();
+  if (!u) return;
+  const name = ($('us-name').value || '').trim();
+  if (!name) { alert('名前を入れてください'); return; }
+  u.name = name;
+  save();
+  refreshUserChip();
+  alert('名前を変更しました');
+});
+$('us-branch-save').addEventListener('click', () => {
+  const u = currentUser();
+  if (!u) return;
+  u.branch = $('us-branch').value;
+  save();
+  alert('拠点を変更しました');
 });
 
 // ===== 在庫一覧 =====
@@ -952,17 +1035,53 @@ function handleMasterAction(b) {
 }
 
 // ===== 設定：アカウント管理 =====
+function branchOptions(selected) {
+  return '<option value="">未設定</option>' + db.branches.map((b) => '<option value="' + esc(b) + '"' + (selected === b ? ' selected' : '') + '>' + esc(b) + '</option>').join('');
+}
 function renderSetAccount() {
   refreshUserChip();
   const u = currentUser();
+  $('acc-branch').innerHTML = branchOptions(db.branches[0] || '');
   $('acc-current').innerHTML = db.users.map((x) => '<option value="' + x.id + '"' + (u && x.id === u.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') || '<option value="">（未登録）</option>';
   const adminExists = db.users.some((x) => x.isAdmin);
   $('acc-body').innerHTML = db.users.map((x) => {
     const canToggle = isAdmin() || !adminExists;
     return '<tr><td>' + esc(x.name) + (u && x.id === u.id ? '（現在のユーザー）' : '') + '</td>' +
+      '<td><select data-ubranch="' + x.id + '" style="padding:6px;font-size:14.5px;">' + branchOptions(x.branch || '') + '</select></td>' +
       '<td><input type="checkbox" data-admin="' + x.id + '"' + (x.isAdmin ? ' checked' : '') + (canToggle ? '' : ' disabled') + ' style="width:22px;height:22px;"></td>' +
       '<td>' + (isAdmin() && (!u || x.id !== u.id) ? '<button type="button" class="btn-danger btn-mini" data-udel="' + x.id + '">削除</button>' : '') + '</td></tr>';
-  }).join('') || '<tr><td colspan="3" class="note">アカウントがありません</td></tr>';
+  }).join('') || '<tr><td colspan="4" class="note">アカウントがありません</td></tr>';
+  $('acc-body').querySelectorAll('[data-ubranch]').forEach((sel) => sel.addEventListener('change', () => {
+    const target = userById(sel.dataset.ubranch);
+    if (!target) return;
+    target.branch = sel.value;
+    save();
+  }));
+  $('br-list').innerHTML = db.branches.map((b) =>
+    '<div class="hist"><span style="font-size:15.5px;">' + esc(b) + '</span>' +
+    '<span class="row-btns" style="display:inline-flex;margin-left:10px;">' +
+    '<button type="button" class="btn-sub btn-mini" data-bact="edit" data-val="' + esc(b) + '">編集</button>' +
+    '<button type="button" class="btn-danger btn-mini" data-bact="del" data-val="' + esc(b) + '">削除</button></span></div>').join('') || '<p class="note">なし</p>';
+  $('br-list').querySelectorAll('[data-bact]').forEach((b) => b.addEventListener('click', () => {
+    const val = b.dataset.val;
+    if (b.dataset.bact === 'edit') {
+      const nv = prompt('拠点名', val);
+      if (nv === null) return;
+      const name = nv.trim();
+      if (!name || name === val) return;
+      if (db.branches.includes(name)) { alert('すでにあります'); return; }
+      db.branches = db.branches.map((x) => (x === val ? name : x));
+      db.users.forEach((x) => { if (x.branch === val) x.branch = name; });
+      save();
+      renderSetAccount();
+    } else {
+      if (!confirm('拠点「' + val + '」を削除しますか？（この拠点のアカウントは「未設定」になります）')) return;
+      db.branches = db.branches.filter((x) => x !== val);
+      db.users.forEach((x) => { if (x.branch === val) x.branch = ''; });
+      save();
+      renderSetAccount();
+    }
+  }));
   $('acc-body').querySelectorAll('[data-admin]').forEach((cb) => cb.addEventListener('change', () => {
     const target = userById(cb.dataset.admin);
     if (!target) return;
@@ -1043,10 +1162,19 @@ function renderSetComments() {
     }
   }));
 }
+$('br-add').addEventListener('click', () => {
+  const v = ($('br-name').value || '').trim();
+  if (!v) { alert('拠点名を入れてください'); return; }
+  if (db.branches.includes(v)) { alert('すでにあります'); return; }
+  db.branches.push(v);
+  save();
+  $('br-name').value = '';
+  renderSetAccount();
+});
 $('btn-acc-add').addEventListener('click', () => {
   const name = ($('acc-name').value || '').trim();
   if (!name) { alert('名前を入れてください'); return; }
-  const nu = { id: uid(), name: name, isAdmin: db.users.length === 0 };
+  const nu = { id: uid(), name: name, isAdmin: db.users.length === 0, branch: $('acc-branch').value || '' };
   db.users.push(nu);
   if (!currentUser()) { currentUserId = nu.id; localStorage.setItem(LS_USER, nu.id); }
   save();
@@ -1074,12 +1202,14 @@ $('btn-wipe').addEventListener('click', () => {
 
 // ===== 初回セットアップ・初期化 =====
 function showSetupIfNeeded() {
-  $('setup-modal').classList.toggle('show', db.users.length === 0);
+  const show = db.users.length === 0;
+  $('setup-modal').classList.toggle('show', show);
+  if (show) $('setup-branch').innerHTML = branchOptions(db.branches[0] || '');
 }
 $('btn-setup').addEventListener('click', () => {
   const name = ($('setup-name').value || '').trim();
   if (!name) { alert('名前を入れてください'); return; }
-  const nu = { id: uid(), name: name, isAdmin: true };
+  const nu = { id: uid(), name: name, isAdmin: true, branch: $('setup-branch').value || '' };
   db.users.push(nu);
   currentUserId = nu.id;
   localStorage.setItem(LS_USER, nu.id);

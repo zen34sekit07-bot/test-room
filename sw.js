@@ -1,5 +1,5 @@
 // sw.js (テストルーム)
-const CACHE_NAME = 'test-room-v8';
+const CACHE_NAME = 'test-room-v9';
 
 const ASSETS_TO_CACHE = [
   './',
