@@ -77,9 +77,7 @@
 <nav class="tabs">
   <button type="button" data-view="stock" class="active">在庫一覧</button>
   <button type="button" data-view="orders">発注管理</button>
-  <button type="button" data-view="register">登録管理</button>
-  <button type="button" data-view="master">マスター</button>
-  <button type="button" data-view="settings">設定</button>
+  <button type="button" data-view="settings" id="tab-settings">設定</button>
 </nav>
 <main>
   <!-- 在庫一覧 -->
@@ -103,8 +101,6 @@
       <h2>発注を登録</h2>
       <label class="f">ジャンルで絞り込み</label>
       <select id="ord-genre"><option value="">全ジャンル</option></select>
-      <label class="f">資材名で検索</label>
-      <input type="text" id="ord-search" placeholder="資材名の一部を入力">
       <label class="f">資材</label>
       <select id="ord-material"></select>
       <label class="f">数量</label>
@@ -118,10 +114,11 @@
     <div id="order-list"></div>
   </section>
 
-  <!-- 登録管理 -->
-  <section id="view-register" style="display:none;">
+  <!-- 新規在庫登録（設定内） -->
+  <section id="view-setreg" style="display:none;">
+    <button type="button" class="back-btn" data-back-settings>← 設定へ戻る</button>
     <div class="card">
-      <h2>資材を登録</h2>
+      <h2>新規在庫登録</h2>
       <label class="f">ジャンル</label>
       <select id="reg-genre"><option value="">選んでください</option></select>
       <label class="f">資材名（ジャンルを選ぶと表示されます）</label>
@@ -136,7 +133,7 @@
       <input type="number" id="reg-high" min="1" value="30">
       <label class="f">保管場所（任意・最初の保管場所コメントになります）</label>
       <select id="reg-place"><option value="">選ばない</option></select>
-      <p class="note">リストにない名前・色・場所は「マスター」画面で先に登録してください。表記ゆれ防止のため、ここでは自由入力できません。</p>
+      <p class="note">リストにない名前・色・場所は「資材マスター登録」で先に登録してください。表記ゆれ防止のため、ここでは自由入力できません。</p>
       <button type="button" class="btn-primary" id="btn-reg-add">登録する</button>
     </div>
     <div class="card">
@@ -145,11 +142,12 @@
     </div>
   </section>
 
-  <!-- マスター管理 -->
-  <section id="view-master" style="display:none;">
+  <!-- 資材マスター登録（設定内） -->
+  <section id="view-setmaster" style="display:none;">
+    <button type="button" class="back-btn" data-back-settings>← 設定へ戻る</button>
     <div class="card">
-      <h2>マスター管理</h2>
-      <p class="note">登録画面で選べる「もと」のデータを管理します。名前を変えると、登録済みの資材にも連動して変わります。</p>
+      <h2>資材マスター登録</h2>
+      <p class="note">新規在庫登録で選べる「もと」のデータを管理します。名前を変えると、登録済みの資材にも連動して変わります。</p>
     </div>
     <div class="card">
       <h2>ジャンル</h2>
@@ -177,10 +175,23 @@
     </div>
   </section>
 
-  <!-- 設定 -->
+  <!-- 設定ハブ（管理者専用） -->
   <section id="view-settings" style="display:none;">
     <div class="card">
-      <h2>アカウントDB</h2>
+      <h2>設定（管理者専用）</h2>
+      <button type="button" class="mat-row" data-goto="setreg"><span class="nm">新規在庫登録</span><span>›</span></button>
+      <button type="button" class="mat-row" data-goto="setmaster"><span class="nm">資材マスター登録</span><span>›</span></button>
+      <button type="button" class="mat-row" data-goto="setaccount"><span class="nm">アカウント管理</span><span>›</span></button>
+      <button type="button" class="mat-row" data-goto="setcomments"><span class="nm">コメント管理</span><span>›</span></button>
+      <button type="button" class="mat-row" data-goto="sethistory"><span class="nm">履歴管理</span><span>›</span></button>
+    </div>
+  </section>
+
+  <!-- アカウント管理（設定内） -->
+  <section id="view-setaccount" style="display:none;">
+    <button type="button" class="back-btn" data-back-settings>← 設定へ戻る</button>
+    <div class="card">
+      <h2>アカウント管理</h2>
       <p class="note">管理者は「履歴の削除」と「管理者設定の変更」ができます。最初の登録者が自動で管理者になります。</p>
       <label class="f">新しいアカウント名</label>
       <input type="text" id="acc-name" placeholder="例：関貴文">
@@ -192,13 +203,28 @@
       <select id="acc-current"></select>
     </div>
     <div class="card">
-      <h2>全体の履歴</h2>
-      <div id="global-history"></div>
-    </div>
-    <div class="card">
       <h2>データ</h2>
       <p class="note">この試作版のデータは、この端末の中（localStorage）にだけ保存されます。</p>
       <button type="button" class="btn-danger" id="btn-wipe">全データを初期化（管理者のみ）</button>
+    </div>
+  </section>
+
+  <!-- コメント管理（設定内） -->
+  <section id="view-setcomments" style="display:none;">
+    <button type="button" class="back-btn" data-back-settings>← 設定へ戻る</button>
+    <div class="card">
+      <h2>コメント管理</h2>
+      <p class="note">全資材のコメントを新しい順に表示します。削除したコメントは、その資材の履歴に赤字で残ります。</p>
+      <div id="comment-admin-list"></div>
+    </div>
+  </section>
+
+  <!-- 履歴管理（設定内） -->
+  <section id="view-sethistory" style="display:none;">
+    <button type="button" class="back-btn" data-back-settings>← 設定へ戻る</button>
+    <div class="card">
+      <h2>履歴管理</h2>
+      <div id="global-history"></div>
     </div>
   </section>
 </main>
@@ -339,28 +365,38 @@ function shouldLogEdit(item) {
 
 // ===== 画面切り替え =====
 const $ = (id) => document.getElementById(id);
+const SETTINGS_VIEWS = ['settings', 'setreg', 'setmaster', 'setaccount', 'setcomments', 'sethistory'];
 function showView(v) {
+  if (SETTINGS_VIEWS.includes(v) && !isAdmin()) v = 'stock'; // 設定内は管理者専用
   currentView = v;
-  ['stock', 'detail', 'orders', 'register', 'master', 'settings'].forEach((k) => {
+  ['stock', 'detail', 'orders', 'settings', 'setreg', 'setmaster', 'setaccount', 'setcomments', 'sethistory'].forEach((k) => {
     $('view-' + k).style.display = (k === v) ? '' : 'none';
   });
   document.querySelectorAll('nav.tabs button').forEach((b) => {
-    b.classList.toggle('active', b.dataset.view === v || (v === 'detail' && b.dataset.view === 'stock'));
+    b.classList.toggle('active', b.dataset.view === v || (v === 'detail' && b.dataset.view === 'stock') || (SETTINGS_VIEWS.includes(v) && b.dataset.view === 'settings'));
   });
   if (v === 'stock') renderStock();
   if (v === 'orders') renderOrders();
-  if (v === 'register') renderRegister();
-  if (v === 'master') renderMasters();
-  if (v === 'settings') renderSettings();
+  if (v === 'setreg') renderRegister();
+  if (v === 'setmaster') renderMasters();
+  if (v === 'setaccount') renderSetAccount();
+  if (v === 'setcomments') renderSetComments();
+  if (v === 'sethistory') renderSetHistory();
 }
 document.querySelectorAll('nav.tabs button').forEach((b) => {
   b.addEventListener('click', () => showView(b.dataset.view));
 });
+document.querySelectorAll('[data-goto]').forEach((b) => b.addEventListener('click', () => showView(b.dataset.goto)));
+document.querySelectorAll('[data-back-settings]').forEach((b) => b.addEventListener('click', () => showView('settings')));
 function refreshUserChip() {
   const u = currentUser();
   $('user-chip').textContent = '👤 ' + (u ? u.name + (u.isAdmin ? '（管理者）' : '') : '未登録');
+  $('tab-settings').style.display = isAdmin() ? '' : 'none';
 }
-$('user-chip').addEventListener('click', () => showView('settings'));
+$('user-chip').addEventListener('click', () => {
+  if (isAdmin()) showView('settings');
+  else alert('設定は管理者専用です');
+});
 
 // ===== 在庫一覧 =====
 function genres() {
@@ -630,8 +666,7 @@ function saveEditMaterial(m) {
 // ===== 発注管理 =====
 function fillOrderMaterials() {
   const g = $('ord-genre').value;
-  const q = ($('ord-search').value || '').trim();
-  const list = db.materials.filter((m) => (!g || m.genre === g) && (!q || m.name.includes(q)));
+  const list = db.materials.filter((m) => (!g || m.genre === g));
   $('ord-material').innerHTML = list.map((m) => '<option value="' + m.id + '">' + esc(m.name) + '（残 ' + m.count + '）</option>').join('') || '<option value="">該当する資材がありません</option>';
 }
 function renderOrders() {
@@ -659,7 +694,6 @@ function renderOrders() {
   box.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => handleOrderAction(b)));
 }
 $('ord-genre').addEventListener('change', fillOrderMaterials);
-$('ord-search').addEventListener('input', fillOrderMaterials);
 $('btn-order-add').addEventListener('click', () => {
   const u = currentUser();
   if (!u) { alert('先にアカウントを登録してください'); showView('settings'); return; }
@@ -831,7 +865,7 @@ function renderMasters() {
       '<button type="button" class="btn-sub btn-mini" data-mact="item-edit" data-val="' + x.id + '">編集</button>' +
       '<button type="button" class="btn-danger btn-mini" data-mact="item-del" data-val="' + x.id + '">削除</button></span></div>').join('');
   }).join('') || '<p class="note">なし</p>';
-  document.querySelectorAll('#view-master [data-mact]').forEach((b) => b.addEventListener('click', () => handleMasterAction(b)));
+  document.querySelectorAll('#view-setmaster [data-mact]').forEach((b) => b.addEventListener('click', () => handleMasterAction(b)));
 }
 function addMasterValue(kind, inputId) {
   const v = ($(inputId).value || '').trim();
@@ -917,8 +951,8 @@ function handleMasterAction(b) {
   }
 }
 
-// ===== 設定（アカウントDB・全体履歴） =====
-function renderSettings() {
+// ===== 設定：アカウント管理 =====
+function renderSetAccount() {
   refreshUserChip();
   const u = currentUser();
   $('acc-current').innerHTML = db.users.map((x) => '<option value="' + x.id + '"' + (u && x.id === u.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') || '<option value="">（未登録）</option>';
@@ -935,7 +969,7 @@ function renderSettings() {
     if (!cb.checked && target.isAdmin && db.users.filter((x) => x.isAdmin).length <= 1) { alert('管理者が最低1人必要です'); cb.checked = true; return; }
     target.isAdmin = cb.checked;
     save();
-    renderSettings();
+    renderSetAccount();
   }));
   $('acc-body').querySelectorAll('[data-udel]').forEach((b) => b.addEventListener('click', () => {
     const target = userById(b.dataset.udel);
@@ -944,18 +978,69 @@ function renderSettings() {
     if (!confirm('アカウント「' + target.name + '」を削除しますか？（過去の投稿は名前が残ります）')) return;
     db.users = db.users.filter((x) => x.id !== target.id);
     save();
-    renderSettings();
+    renderSetAccount();
   }));
+}
+// ===== 設定：履歴管理 =====
+function renderSetHistory() {
   const hs = db.history.slice().reverse();
   $('global-history').innerHTML = hs.length ? hs.map((x) =>
     '<div class="hist' + (x.red ? ' red' : '') + '"><div class="h-head">' + fmtDateTime(x.ts) + ' ・ ' + esc(x.userName) + ' ・ ' + esc(x.materialName || '') + '</div>' + esc(x.text) +
-    (isAdmin() ? ' <button type="button" class="btn-danger btn-mini" data-ghdel="' + x.id + '">この履歴を消す</button>' : '') + '</div>').join('')
+    ' <button type="button" class="btn-danger btn-mini" data-ghdel="' + x.id + '">この履歴を消す</button></div>').join('')
     : '<p class="note">履歴はまだありません。</p>';
   $('global-history').querySelectorAll('[data-ghdel]').forEach((b) => b.addEventListener('click', () => {
     if (!confirm('この履歴を削除しますか？（管理者のみ可能）')) return;
     db.history = db.history.filter((x) => x.id !== b.dataset.ghdel);
     save();
-    renderSettings();
+    renderSetHistory();
+  }));
+}
+// ===== 設定：コメント管理 =====
+let setEditingCommentId = null;
+function renderSetComments() {
+  const SECTION_LABEL = { order: '発注・数量', place: '保管場所', general: 'コメント' };
+  const cs = db.comments.slice().sort((a, b) => b.createdAt - a.createdAt);
+  const box = $('comment-admin-list');
+  if (!cs.length) { box.innerHTML = '<p class="note">コメントはまだありません。</p>'; return; }
+  box.innerHTML = cs.map((c) => {
+    const m = materialById(c.materialId);
+    let h = '<div class="comment"><div class="c-head">' + esc(m ? m.name : '（削除された資材）') + ' ・ ' + SECTION_LABEL[c.section] + ' ・ ' + esc(c.authorName) + ' ・ ' + fmtDateTime(c.createdAt) + (c.editedAt ? '（編集済み）' : '') + '</div>';
+    if (setEditingCommentId === c.id) {
+      h += '<textarea id="set-edit-ta-' + c.id + '">' + esc(c.text) + '</textarea>' +
+        '<div class="row-btns"><button type="button" class="btn-sub btn-mini" data-sact="save" data-id="' + c.id + '">保存</button>' +
+        '<button type="button" class="btn-sub btn-mini" data-sact="cancel">キャンセル</button></div>';
+    } else {
+      h += '<div class="c-text">' + esc(c.text) + '</div>' +
+        '<div class="row-btns"><button type="button" class="btn-sub btn-mini" data-sact="edit" data-id="' + c.id + '">編集</button>' +
+        '<button type="button" class="btn-danger btn-mini" data-sact="del" data-id="' + c.id + '">削除</button></div>';
+    }
+    return h + '</div>';
+  }).join('');
+  box.querySelectorAll('[data-sact]').forEach((b) => b.addEventListener('click', () => {
+    const c = db.comments.find((x) => x.id === b.dataset.id);
+    if (b.dataset.sact === 'edit') { setEditingCommentId = b.dataset.id; renderSetComments(); return; }
+    if (b.dataset.sact === 'cancel') { setEditingCommentId = null; renderSetComments(); return; }
+    if (!c) return;
+    if (b.dataset.sact === 'save') {
+      const text = ($('set-edit-ta-' + c.id).value || '').trim();
+      setEditingCommentId = null;
+      if (!text || text === c.text) { renderSetComments(); return; }
+      const old = c.text;
+      c.text = text;
+      c.editedAt = now();
+      if (shouldLogEdit(c)) {
+        addHistory(c.materialId, 'edit', 'コメントを編集：「' + old + '」→「' + text + '」（コメント管理から）', { mergeKey: 'comment:' + c.id, fromText: old, toText: text });
+      }
+      save();
+      renderSetComments();
+    }
+    if (b.dataset.sact === 'del') {
+      if (!confirm('このコメントを削除しますか？（その資材の履歴に赤字で残ります）')) return;
+      addHistory(c.materialId, 'delete', 'コメントを削除：「' + c.text + '」（投稿者：' + c.authorName + '、コメント管理から）', { red: true });
+      db.comments = db.comments.filter((x) => x.id !== c.id);
+      save();
+      renderSetComments();
+    }
   }));
 }
 $('btn-acc-add').addEventListener('click', () => {
@@ -966,12 +1051,13 @@ $('btn-acc-add').addEventListener('click', () => {
   if (!currentUser()) { currentUserId = nu.id; localStorage.setItem(LS_USER, nu.id); }
   save();
   $('acc-name').value = '';
-  renderSettings();
+  renderSetAccount();
 });
 $('acc-current').addEventListener('change', () => {
   currentUserId = $('acc-current').value || null;
   if (currentUserId) localStorage.setItem(LS_USER, currentUserId); else localStorage.removeItem(LS_USER);
-  renderSettings();
+  refreshUserChip();
+  if (isAdmin()) renderSetAccount(); else showView('stock');
 });
 $('btn-wipe').addEventListener('click', () => {
   if (!isAdmin()) { alert('初期化は管理者のみ可能です'); return; }
@@ -981,6 +1067,7 @@ $('btn-wipe').addEventListener('click', () => {
   localStorage.removeItem(LS_USER);
   currentUserId = null;
   seed();
+  refreshUserChip();
   showSetupIfNeeded();
   showView('stock');
 });
