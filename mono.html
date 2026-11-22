@@ -148,10 +148,6 @@
       <p class="note" id="st-server"></p>
     </div>
     <div class="card">
-      <h2>クレジット</h2>
-      <div id="credits-box"></div>
-    </div>
-    <div class="card">
       <h2>更新履歴</h2>
       <div id="changelog-box"></div>
     </div>
@@ -492,9 +488,6 @@ $('btn-save-item').addEventListener('click', async () => {
 
 // ===== 設定 =====
 function fillCredits() {
-  $('credits-box').innerHTML = '<p style="margin:4px 0;">物の住所録（試作版）</p>' +
-    '<p style="margin:4px 0;">制作：関貴文（株式会社ユー花園 所沢支店 施工課）</p>' +
-    '<p style="margin:4px 0;">開発支援：Gemini (Google) / Muse (Meta)</p>';
   $('changelog-box').innerHTML = CHANGELOG.map((c) => '<div class="hist"><div class="h-head">' + c.date + '</div>' + esc(c.text) + '</div>').join('');
 }
 function renderSettings() {
