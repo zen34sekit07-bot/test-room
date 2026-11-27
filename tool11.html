@@ -15,7 +15,7 @@
     body {
         margin: 0; background-color: #eeeeec; color: #262626;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
-        font-size: 16px; min-height: 100dvh;
+        font-size: 16px; min-height: 100dvh; overflow-x: hidden;
     }
     .wrap { max-width: 640px; margin: 0 auto; padding: 16px 12px 90px; }
     h1 { font-size: 21px; font-weight: bold; margin: 4px 0 4px; border-left: 6px solid #2563eb; padding-left: 10px; }
@@ -27,15 +27,16 @@
     .userbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .userbar select { font-size: 16px; padding: 10px; border: 2px solid #262626; border-radius: 10px; background: #ffffff; flex: 1; min-width: 150px; }
     .tabs { position: fixed; left: 0; right: 0; bottom: 0; background: #ffffff; border-top: 2px solid #d9d9d7; display: flex; z-index: 40; }
-    .tabs button { flex: 1; background: none; border: none; font-size: 13px; font-weight: bold; color: #555555; padding: 10px 2px 14px; cursor: pointer; }
+    .tabs button { flex: 1; background: none; border: none; font-size: 12px; font-weight: bold; color: #555555; padding: 10px 1px 14px; cursor: pointer; white-space: nowrap; }
     .tabs button.on { color: #1d4ed8; box-shadow: inset 0 3px 0 #2563eb; }
     .monthbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
     .monthbar .mtitle { font-size: 20px; font-weight: bold; flex: 1; text-align: center; }
     .mnav { font-size: 16px; font-weight: bold; background: #ffffff; border: 2px solid #2563eb; color: #1d4ed8; border-radius: 10px; padding: 8px 14px; cursor: pointer; }
-    .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
     .cal .dow { text-align: center; font-size: 13px; font-weight: bold; color: #555555; padding: 4px 0; }
     .cal .dow.sun { color: #dc2626; } .cal .dow.sat { color: #1d4ed8; }
-    .cell { background: #ffffff; border: 2px solid #d9d9d7; border-radius: 10px; min-height: 88px; padding: 4px; cursor: pointer; position: relative; }
+    .cell { background: #ffffff; border: 2px solid #d9d9d7; border-radius: 10px; min-height: 88px; padding: 4px; cursor: pointer; position: relative; min-width: 0; overflow: hidden; }
+    .cell.myoff { background: #fff1f2; border-color: #fda4af; }
     .cell.today { border-color: #2563eb; box-shadow: 0 0 0 2px #93c5fd; }
     .cell .dnum { font-size: 15px; font-weight: bold; }
     .cell .rokuyo { display: block; font-size: 10px; color: #6f6f6f; white-space: nowrap; }
@@ -92,7 +93,12 @@
     table.ltbl tr.t-part td.nm { background: #fdf2f8; }
     table.ltbl tr.t-itaku td.nm { background: #eff6ff; }
     .mk { font-weight: bold; font-size: 13px; }
-    .mk-fixed { color: #262626; } .mk-kibou { color: #1d4ed8; } .mk-yukyu { color: #7c3aed; } .mk-auto { color: #d97706; }
+    .mk-fixed { color: #dc2626; } .mk-kibou { color: #1d4ed8; } .mk-yukyu { color: #7c3aed; } .mk-auto { color: #d97706; }
+    table.ltbl td.off-fixed { background: #fee2e2; }
+    table.ltbl td.off-kibou { background: #dbeafe; }
+    table.ltbl td.off-yukyu { background: #ede9fe; }
+    table.ltbl td.off-auto { background: #ffedd5; }
+    table.ltbl td.off-fixed.tomo { background: #fee2e2; }
     .mk-duty { display: block; font-size: 9px; color: #2563eb; font-weight: bold; }
     .mk-cut { color: #9ca3af; font-size: 11px; }
 </style>
@@ -102,7 +108,7 @@
     <a class="backlink" href="index.html">‹ テストルームへ戻る</a>
     <h1>シフト希望・公休管理</h1>
     <p class="sub">公休9日ルール・六曜による混雑表示・希望の競合と抽選・有給の記録に対応した試作です。</p>
-    <div class="sample-note">⚠ 試作版：メンバー22人はサンプルデータで、この端末の中だけに保存されます。実運用では共有の保存先（GAS等）に接続します。</div>
+    <div class="sample-note">⚠ 試作版：名簿と2026年12月分の休みは実際の休日一覧表に合わせてあります。データはこの端末の中だけに保存されます。実運用では共有の保存先（GAS等）に接続します。雇用形態や定休パターンの推定が違うところは管理者ページで直せます。</div>
 
     <div class="card">
         <div class="userbar">
@@ -135,7 +141,7 @@
 <script>
 'use strict';
 /* ================= データ ================= */
-const LS_KEY = 'tool11_shift_v1';
+const LS_KEY = 'tool11_shift_v2';
 const LS_USER = 'tool11_user';
 const WD = ['日','月','火','水','木','金','土'];
 
@@ -147,42 +153,55 @@ function seedDB() {
     { id:'itaku',    name:'業務委託', kokyu:false, warnOver:false, toban:false, yukyu:false, yukyuGrant:0 }
   ];
   // fixedOff: 定休の曜日(0=日..6=土) / null=固定なし（希望ベース）
-  const M = (id,name,type,dept,fixedOff,early,late) => ({ id, name, type, dept, fixedOff, tobanEarly:early||[], tobanLate:late||[], loseCount:0, active:true });
+  // 名簿と並び順は「所沢支店 休日一覧表 令和8年12月分」に合わせたもの
+  const M = (id,no,name,type,dept,fixedOff,early,late) => ({ id, no, name, type, dept, fixedOff, tobanEarly:early||[], tobanLate:late||[], loseCount:0, active:true });
   const members = [
-    M('m01','関 貴文','seishain','施工課',[1,2],[0],[5]),
-    M('m02','佐藤 健一','seishain','施工課',[1,3],[1],[2]),
-    M('m03','鈴木 翔太','seishain','施工課',[2,4],[2],[3]),
-    M('m04','高橋 大輔','seishain','施工課',[1,2],[3],[4]),
-    M('m05','田中 美咲','seishain','施工課',[3,5],[4],[0]),
-    M('m06','伊藤 直樹','seishain','施工課',[1,4],[5],[1]),
-    M('m07','渡辺 葵','seishain','施工課',[2,3],[6],[6]), // 退職予定のため 12/9〜12/31 が有給消化期間（サンプル）
-    M('m08','山本 蓮','seishain','施工課',[1,5],[0],[0]),
-    M('m09','中村 悠','seishain','施工課',[4,5],[1],[5]),
-    M('m10','小林 駿','seishain','施工課',[1,2],[2],[1]),
-    M('m11','橋場 誠','seishain','生産管理課',[1,3],[],[]),
-    M('m12','加藤 里奈','seishain','生産管理課',[2,4],[],[]),
-    M('m13','吉田 拓海','seishain','生産管理課',[1,2],[],[]),
-    M('m14','山田 花','keiyaku','施工課',[1,2],[],[]),
-    M('m15','松本 樹','keiyaku','施工課',[3,4],[],[]),
-    M('m16','井上 凛','keiyaku','施工課',[1,5],[],[]),
-    M('m17','木村 春樹','part','施工課',[1,2],[],[]),
-    M('m18','林 さくら','part','施工課',[4,5],[],[]),
-    M('m19','清水 結衣','part','施工課',null,[],[]),
-    M('m20','森 健太','part','施工課',null,[],[]),
-    M('m21','運送・岡田','itaku','運送',[0,1,2,4,5,6],[],[]),
-    M('m22','運送・西村','itaku','運送',[0,1,3,4,5,6],[],[])
+    M('n01', 1, '日光 宏文', 'seishain', '施工課', [0,6]),
+    M('n02', 2, '西村 陽一', 'seishain', '施工課', [2,3]),
+    M('n04', 4, '小林 弘徳', 'seishain', '施工課', [4,5]),
+    M('n05', 5, '関 貴文', 'seishain', '施工課', [1,2], [0], [5]),
+    M('n06', 6, '戸村 隼哉', 'seishain', '施工課', [0,6]),
+    M('n07', 7, '宇佐美 雅之', 'seishain', '施工課', [4,5]),
+    M('n08', 8, '矢口 歩実', 'seishain', '施工課', [0,6]),
+    M('n09', 9, '吉岡 真奈', 'seishain', '施工課', [5,6]),
+    M('n10', 10, '茂井 新菜', 'seishain', '施工課', [5,6]),
+    M('n11', 11, '岡崎 瑠果', 'seishain', '施工課', [3,4]),
+    M('n13', 13, '千葉 秋香', 'seishain', '施工課', [1,2]),
+    M('n14', 14, '黒澤（加納屋）', 'itaku', '運送', null),
+    M('n15', 15, '土屋（メジャー）', 'itaku', '運送', null),
+    M('n16', 16, '門脇（委）', 'itaku', '運送', [0,6]),
+    M('n17', 17, '詫摩 貴之', 'seishain', '施工課', [1,2]),
+    M('n18', 18, '山口 由美子', 'seishain', '施工課', [4,5]),
+    M('n19', 19, '武信 郁子', 'part', '施工課', [0,3,4,5,6]),
+    M('n20', 20, '山口 明子', 'part', '施工課', null),
+    M('n21', 21, '佐々木 一平', 'seishain', '施工課', null),
+    M('n22', 22, '柏原 千夏子', 'part', '施工課', null),
+    M('n23', 23, '乙幡 直美', 'part', '施工課', null)
   ];
   const db = {
     types, members,
-    requests: [],       // {id, memberId, date, kind:'kibou'|'yukyu'|'cut', status:'pending'|'confirmed'|'lost'|'auto', note}
+    requests: [],       // {id, memberId, date, kind:'kibou'|'yukyu'|'cut'|'half', status:'pending'|'confirmed'|'lost'|'auto', note}
     busyOverride: {},   // date -> 'calm'|'mid'|'busy'
     settings: { capacity: { calm:3, mid:2, busy:1 }, deadlineDay:25, discussDay:27, lotteryDay:28, kokyuTarget:9 },
     lotteryLog: []      // {at, date, winners:[], losers:[]}
   };
-  // 有給消化期間のサンプル（退職予定のメンバー）
-  const m07 = db.members.find(m => m.id === 'm07');
-  m07.leaveFrom = '2026-12-09'; m07.leaveTo = '2026-12-31';
-  db.requests.push(...leaveRequestsFor(db, m07));
+  // 2026年12月分：休日一覧表に合わせた「定休パターン以外」の休み・出勤・有給を確定分として入れる
+  const D = d => '2026-12-' + String(d).padStart(2, '0');
+  const add = (mid, d, kind, note) => db.requests.push({ id: 'dec' + mid + '-' + d, memberId: mid, date: D(d), kind, status: 'confirmed', note: note || '確定シフト' });
+  [['n06',7],['n06',28],['n08',7],['n08',21],['n08',28],['n09',27],['n09',31],['n10',13],['n10',31],['n18',19]].forEach(([m, d]) => add(m, d, 'kibou'));
+  [1,6,7,12,13,18,19,24,25,29,30].forEach(d => add('n14', d, 'kibou'));
+  [6,12,18,24,29].forEach(d => add('n15', d, 'kibou'));
+  [2,3,6,7,9,10,13,14,16,17,20,21,23,24,27,28,30,31].forEach(d => add('n20', d, 'kibou'));
+  [2,4,5,9,10,13,16,20,23,27,31].forEach(d => add('n21', d, 'kibou'));
+  [3,5,6,10,12,13,17,19,20,24,26,27,29,30,31].forEach(d => add('n22', d, 'kibou'));
+  [3,5,7,8,11,15,18,19,21,22,24,25,29,30,31].forEach(d => add('n23', d, 'kibou'));
+  add('n08', 19, 'cut'); add('n08', 26, 'cut');
+  add('n05', 12, 'yukyu');
+  add('n16', 31, 'half', 'PM休');
+  // 宇佐美：退職のため 12/9〜12/31 が有給消化期間
+  const usami = db.members.find(m => m.id === 'n07');
+  usami.leaveFrom = '2026-12-09'; usami.leaveTo = '2026-12-31';
+  db.requests.push(...leaveRequestsFor(db, usami));
   return db;
 }
 function leaveRequestsFor(db, m) {
@@ -207,8 +226,8 @@ save();
 const typeOf = m => DB.types.find(t => t.id === m.type) || DB.types[0];
 const memberOf = id => DB.members.find(m => m.id === id);
 function isAdmin() { return currentUserId === 'admin'; }
-let currentUserId = localStorage.getItem(LS_USER) || 'm01';
-if (currentUserId !== 'admin' && !memberOf(currentUserId)) currentUserId = 'm01';
+let currentUserId = localStorage.getItem(LS_USER) || 'n05';
+if (currentUserId !== 'admin' && !memberOf(currentUserId)) currentUserId = 'n05';
 function me() { return isAdmin() ? null : memberOf(currentUserId); }
 
 /* ================= 日付・六曜 ================= */
@@ -255,7 +274,9 @@ function kibouCount(dateStr) {
   return DB.requests.filter(r => r.date === dateStr && r.kind === 'kibou' && (r.status === 'pending' || r.status === 'confirmed')).length;
 }
 function isConflict(dateStr) {
-  return kibouCount(dateStr) > DB.settings.capacity[busyLevel(dateStr)];
+  // 競合は「未確定の希望」が枠を超えた場合のみ（確定済みシフトは対象外）
+  const pending = DB.requests.filter(r => r.date === dateStr && r.kind === 'kibou' && r.status === 'pending').length;
+  return pending > DB.settings.capacity[busyLevel(dateStr)];
 }
 function myReq(memberId, dateStr, kind) {
   return DB.requests.find(r => r.memberId === memberId && r.date === dateStr && r.kind === kind && r.status !== 'lost');
@@ -273,14 +294,16 @@ function kokyuInfo(m, y, mo) {
   return { fixedCount: fixed.length, target, shortage: Math.max(0, target - fixed.length), over: Math.max(0, fixed.length - target), cuts, autos, kibouUsed, effective };
 }
 function yukyuUsed(memberId, y, mo) {
-  // 有給消化：確定した有給希望＋公休超過の自動有給
-  return DB.requests.filter(r => {
-    if (r.memberId !== memberId || r.kind !== 'yukyu') return false;
-    if (r.status !== 'confirmed' && r.status !== 'auto') return false;
-    if (y && mo) { const d = parseD(r.date); return d.getFullYear() === y && d.getMonth()+1 === mo; }
-    if (y) { return parseD(r.date).getFullYear() === y; }
-    return true;
-  }).length;
+  // 有給消化：確定した有給希望＋公休超過の自動有給＋半日休み(0.5)
+  return DB.requests.reduce((sum, r) => {
+    if (r.memberId !== memberId) return sum;
+    if (r.status !== 'confirmed' && r.status !== 'auto') return sum;
+    if (y && mo) { const d = parseD(r.date); if (!(d.getFullYear() === y && d.getMonth()+1 === mo)) return sum; }
+    else if (y) { if (parseD(r.date).getFullYear() !== y) return sum; }
+    if (r.kind === 'yukyu') return sum + 1;
+    if (r.kind === 'half') return sum + 0.5;
+    return sum;
+  }, 0);
 }
 function dutyOn(dateStr) {
   const wd = parseD(dateStr).getDay();
@@ -336,16 +359,17 @@ function renderCal() {
     DB.members.forEach(mm => { if (mm.active && mm.fixedOff && mm.fixedOff.includes(d.getDay())) offNames.push(mm.name.split(' ')[0]); });
     reqsOn(ds, 'kibou').forEach(r => { const mm = memberOf(r.memberId); if (mm) offNames.push(mm.name.split(' ')[0] + '(希)'); });
     reqsOn(ds, 'yukyu').forEach(r => { const mm = memberOf(r.memberId); if (mm) offNames.push(mm.name.split(' ')[0] + '(有)'); });
-    let mine = '';
+    let mine = '', myOff = false;
     if (m) {
       if (m.fixedOff && m.fixedOff.includes(d.getDay())) {
         const cut = myReq(m.id, ds, 'cut');
         const auto = DB.requests.find(r => r.memberId === m.id && r.date === ds && r.kind === 'yukyu' && r.status === 'auto');
-        mine = auto ? '<div class="mine" style="color:#d97706;">有給(自動)</div>' : cut ? '<div class="mine" style="color:#dc2626;">出勤にする</div>' : '<div class="mine" style="color:#16a34a;">定休</div>';
-      } else if (myReq(m.id, ds, 'kibou')) mine = '<div class="mine" style="color:#1d4ed8;">希望休</div>';
-      else if (myReq(m.id, ds, 'yukyu')) mine = '<div class="mine" style="color:#7c3aed;">有給</div>';
+        mine = auto ? '<div class="mine" style="color:#d97706;">有給(自動)</div>' : cut ? '<div class="mine" style="color:#dc2626;">出勤にする</div>' : '<div class="mine" style="color:#dc2626;">定休</div>';
+        myOff = !cut;
+      } else if (myReq(m.id, ds, 'kibou')) { mine = '<div class="mine" style="color:#1d4ed8;">希望休</div>'; myOff = true; }
+      else if (myReq(m.id, ds, 'yukyu')) { mine = '<div class="mine" style="color:#7c3aed;">有給</div>'; myOff = true; }
     }
-    h += '<div class="cell' + (ds === todayStr ? ' today' : '') + (isConflict(ds) ? ' conflict' : '') + '" data-date="' + ds + '">'
+    h += '<div class="cell' + (ds === todayStr ? ' today' : '') + (isConflict(ds) ? ' conflict' : '') + (myOff ? ' myoff' : '') + '" data-date="' + ds + '">'
       + '<span class="dnum">' + d.getDate() + '</span> <span class="rokuyo">' + (rokuyoOf(ds) || '') + '</span>'
       + '<span class="busy busy-' + lv + '">' + BUSY_MARK[lv] + '</span>'
       + (duty.early.length ? '<div class="duty">早:' + duty.early.map(n => '<span class="pn">' + n.split(' ')[0] + '</span>').join('・') + '</div>' : '')
@@ -366,18 +390,19 @@ function cellMark(m, ds) {
   const cut = myReq(m.id, ds, 'cut');
   const auto = DB.requests.find(r => r.memberId === m.id && r.date === ds && r.kind === 'yukyu' && r.status === 'auto');
   const yk = myReq(m.id, ds, 'yukyu');
+  const half = DB.requests.find(r => r.memberId === m.id && r.date === ds && r.kind === 'half');
   const kb = DB.requests.find(r => r.memberId === m.id && r.date === ds && r.kind === 'kibou');
   const isFixed = m.fixedOff && m.fixedOff.includes(wd);
-  let mark = '';
-  if (isFixed && !cut) mark = auto ? '<span class="mk mk-auto">有</span>' : '<span class="mk mk-fixed">休</span>';
-  else if (yk) mark = '<span class="mk mk-yukyu">有</span>';
-  else if (kb && kb.status !== 'lost') mark = '<span class="mk mk-kibou">休</span>';
+  let mark = '', cls = '';
+  if (isFixed && !cut) { mark = auto ? '<span class="mk mk-auto">有</span>' : '<span class="mk mk-fixed">休</span>'; cls = auto ? 'off-auto' : 'off-fixed'; }
+  else if (yk) { mark = '<span class="mk mk-yukyu">有</span>'; cls = 'off-yukyu'; }
+  else if (half) { mark = '<span class="mk mk-yukyu" style="font-size:9px;">PM休</span>'; cls = 'off-yukyu'; }
+  else if (kb && kb.status !== 'lost') { mark = '<span class="mk mk-kibou">休</span>'; cls = 'off-kibou'; }
   else if (kb && kb.status === 'lost') mark = '<span class="mk-cut">外</span>';
   else if (cut) mark = '<span class="mk-cut">出</span>';
   const duties = myDuty(m, ds);
-  if (duties.length && !mark) mark = '<span class="mk-duty">' + duties.map(x => x[0]).join('・') + '</span>';
-  else if (duties.length) mark += '<span class="mk-duty">' + duties.map(x => x[0]).join('・') + '</span>';
-  return mark;
+  if (duties.length) mark += '<span class="mk-duty">' + duties.map(x => x[0]).join('・') + '</span>';
+  return { html: mark, cls };
 }
 function renderList() {
   const el = $('view-list');
@@ -388,11 +413,12 @@ function renderList() {
   h += '<tr><th class="nm"></th>' + dates.map(ds => { const d = parseD(ds); return '<th class="' + (rokuyoOf(ds) === '友引' ? 'tomo' : '') + '">' + d.getDate() + '</th>'; }).join('') + '<th></th></tr></thead><tbody>';
   DB.members.filter(m => m.active).forEach((m, idx) => {
     let offCount = 0;
-    h += '<tr class="t-' + m.type + '"><td class="nm">' + (idx + 1) + '. ' + esc(m.name) + '</td>';
+    h += '<tr class="t-' + m.type + '"><td class="nm">' + (m.no || idx + 1) + '. ' + esc(m.name) + '</td>';
     dates.forEach(ds => {
       const mk = cellMark(m, ds);
-      if (mk.includes('>休<') || mk.includes('>有<')) offCount++;
-      h += '<td class="' + (rokuyoOf(ds) === '友引' ? 'tomo' : '') + '">' + mk + '</td>';
+      if (mk.html.includes('>休<') || mk.html.includes('>有<')) offCount++;
+      const classes = [rokuyoOf(ds) === '友引' ? 'tomo' : '', mk.cls].filter(Boolean).join(' ');
+      h += '<td class="' + classes + '">' + mk.html + '</td>';
     });
     h += '<td><b>' + offCount + '</b></td></tr>';
   });
@@ -401,7 +427,7 @@ function renderList() {
     DB.members.forEach(m => { if (!m.active) return; const wd = parseD(ds).getDay(); const off = (m.fixedOff && m.fixedOff.includes(wd) && !myReq(m.id, ds, 'cut')) || myReq(m.id, ds, 'kibou') || myReq(m.id, ds, 'yukyu'); if (off) n++; });
     return '<td style="background:#f4f4f2;"><b>' + n + '</b></td>';
   }).join('') + '<td style="background:#f4f4f2;"></td></tr>';
-  h += '</tbody></table></div><div class="legend">休（黒）＝定休 ／ 休（青）＝希望休 ／ 有（紫）＝有給 ／ 有（橙）＝公休超過の自動有給 ／ 黄色い列＝友引 ／ セル下の「早・遅」は当番。横にスクロールできます。</div></div>';
+  h += '</tbody></table></div><div class="legend">休（赤）＝定休 ／ 休（青）＝希望休 ／ 有（紫）＝有給 ／ 有（橙）＝公休超過の自動有給 ／ 黄色い列＝友引 ／ セル下の「早・遅」は当番。横にスクロールできます。</div></div>';
   el.innerHTML = h;
   $('prevM2').addEventListener('click', () => { viewM--; if (viewM < 1) { viewM = 12; viewY--; } renderAll(); });
   $('nextM2').addEventListener('click', () => { viewM++; if (viewM > 12) { viewM = 1; viewY++; } renderAll(); });
@@ -420,6 +446,7 @@ function openDay(ds) {
   DB.members.forEach(mm => { if (mm.active && mm.fixedOff && mm.fixedOff.includes(d.getDay()) && !myReq(mm.id, ds, 'cut')) offList.push(esc(mm.name) + '（定休）'); });
   reqsOn(ds, 'kibou').forEach(r => { const mm = memberOf(r.memberId); if (mm) offList.push(esc(mm.name) + '（希望休）'); });
   reqsOn(ds, 'yukyu').forEach(r => { const mm = memberOf(r.memberId); if (mm) offList.push(esc(mm.name) + '（有給' + (r.status === 'auto' ? '・自動' : '') + '）'); });
+  reqsOn(ds, 'half').forEach(r => { const mm = memberOf(r.memberId); if (mm) offList.push(esc(mm.name) + '（' + esc(r.note || '半日休み') + '）'); });
   h += '<div class="kv">休みの人：' + (offList.join('、') || 'なし') + '</div>';
   if (isConflict(ds)) h += '<div class="warn red"><b>希望が枠を超えています（競合）。</b><br>' + DB.settings.discussDay + '日までに話し合って ' + DB.settings.capacity[lv] + ' 人に絞ってください。決まらない場合は ' + DB.settings.lotteryDay + ' 日にランダム抽選で決まります。</div>';
 
@@ -513,7 +540,7 @@ function renderMine() {
   h += '<h2 class="sec">今月の希望・申請</h2>';
   h += myReqs.length ? myReqs.map(r => {
     const d = parseD(r.date);
-    const kindLabel = { kibou:'希望休', yukyu:'有給', cut:'出勤にする（公休を削る）' }[r.kind];
+    const kindLabel = { kibou:'希望休', yukyu:'有給', cut:'出勤にする（公休を削る）', half:'半日休み' }[r.kind];
     const st = r.status === 'lost' ? '（抽選で外れ）' : r.status === 'auto' ? '（自動）' : '';
     return '<div class="kv">' + (d.getMonth()+1) + '/' + d.getDate() + '（' + WD[d.getDay()] + '）' + kindLabel + st + '</div>';
   }).join('') : '<div class="kv">まだありません。カレンダーから日を選んで希望を出してください。</div>';
@@ -636,6 +663,7 @@ function memberForm(id) {
   const m = id ? memberOf(id) : { id: null, name: '', type: DB.types[0].id, dept: '施工課', fixedOff: [1,2], tobanEarly: [], tobanLate: [], loseCount: 0, active: true };
   const box = $('memberForm');
   box.innerHTML = '<form id="mf" class="card" style="background:#f9fafb;"><h2 class="sec" style="margin-top:0;">' + (id ? 'メンバー編集' : 'メンバー追加') + '</h2>'
+    + '<label class="f">番号（一覧表の番号）</label><input class="t" type="number" name="no" value="' + (m.no || '') + '">'
     + '<label class="f">名前</label><input class="t" name="name" value="' + esc(m.name) + '">'
     + '<label class="f">雇用形態</label><select class="t" name="type">' + DB.types.map(t => '<option value="' + t.id + '"' + (t.id === m.type ? ' selected' : '') + '>' + esc(t.name) + '</option>').join('') + '</select>'
     + '<label class="f">所属</label><input class="t" name="dept" value="' + esc(m.dept) + '">'
@@ -653,6 +681,7 @@ function memberForm(id) {
     e.preventDefault();
     const f = e.target;
     const data = {
+      no: Number(f.no.value) || null,
       name: f.name.value.trim() || '無名',
       type: f.type.value, dept: f.dept.value.trim() || '施工課',
       fixedOff: f.noFixed.checked ? null : readChecks(f, 'fixedOff'),
