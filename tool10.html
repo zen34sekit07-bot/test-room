@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>商品コード照合チェック（試作）</title>
+<meta name="theme-color" content="#f4f4f2">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<script>
+    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
+</script>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        margin: 0; background-color: #eeeeec; color: #262626;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+        font-size: 16px; min-height: 100dvh;
+    }
+    .wrap { max-width: 560px; margin: 0 auto; padding: 18px 14px 48px; }
+    h1 { font-size: 21px; font-weight: bold; margin: 4px 0 4px; border-left: 6px solid #2563eb; padding-left: 10px; }
+    .sub { color: #555555; font-size: 14px; margin: 0 0 14px 16px; line-height: 1.5; }
+    .sample-note {
+        background: #fef9c3; border: 2px solid #eab308; border-radius: 10px;
+        padding: 10px 12px; font-size: 14px; line-height: 1.5; margin-bottom: 16px;
+    }
+    .steps { display: flex; gap: 6px; margin-bottom: 16px; }
+    .step-chip {
+        flex: 1; text-align: center; font-size: 13px; font-weight: bold;
+        background: #ffffff; color: #6f6f6f; border: 2px solid #d9d9d7; border-radius: 999px; padding: 7px 2px;
+    }
+    .step-chip.on { background: #2563eb; border-color: #2563eb; color: #ffffff; }
+    .step-chip.done { background: #dcfce7; border-color: #16a34a; color: #166534; }
+    .card {
+        background: #ffffff; border: 2px solid #d9d9d7; border-radius: 14px;
+        padding: 16px; margin-bottom: 14px;
+    }
+    .card h2 { font-size: 18px; margin: 0 0 6px; border-left: 5px solid #2563eb; padding-left: 8px; }
+    .card .hint { font-size: 14px; color: #555555; line-height: 1.6; margin: 0 0 12px; }
+    .code-input {
+        width: 100%; font-size: 26px; font-weight: bold; letter-spacing: 2px;
+        padding: 12px; border: 3px solid #262626; border-radius: 10px; text-transform: uppercase;
+        background: #ffffff; color: #262626;
+    }
+    .code-input:focus { outline: 3px solid #93c5fd; }
+    .candidates { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .cand {
+        font-size: 16px; font-weight: bold; padding: 9px 14px; border-radius: 999px;
+        border: 2px solid #2563eb; background: #ffffff; color: #1d4ed8; cursor: pointer;
+    }
+    .cand:active { background: #dbeafe; }
+    .notfound { font-size: 14px; color: #b91c1c; font-weight: bold; margin-top: 10px; display: none; }
+    .code-echo { display: none; margin-top: 14px; text-align: center; }
+    .code-echo .label { font-size: 13px; color: #555555; margin-bottom: 4px; }
+    .code-echo .chars { font-size: 38px; font-weight: bold; letter-spacing: 4px; }
+    .code-echo .chars .diff-char { color: #dc2626; background: #fee2e2; border-radius: 6px; padding: 0 3px; }
+    .code-echo .pair-note { font-size: 14px; color: #b91c1c; font-weight: bold; margin-top: 6px; }
+    .btn {
+        display: block; width: 100%; font-size: 18px; font-weight: bold;
+        padding: 14px; border-radius: 12px; border: none; cursor: pointer; margin-top: 14px;
+        background: #2563eb; color: #ffffff;
+    }
+    .btn:disabled { background: #b6c6e8; color: #ffffff; cursor: not-allowed; }
+    .btn.ghost { background: #ffffff; color: #1d4ed8; border: 2px solid #2563eb; }
+    .btn.danger { background: #dc2626; color: #ffffff; }
+    .verdict { display: none; border-radius: 12px; padding: 14px; font-size: 17px; font-weight: bold; line-height: 1.5; margin-top: 14px; }
+    .verdict.ok { display: block; background: #dcfce7; border: 2px solid #16a34a; color: #166534; }
+    .verdict.ng { display: block; background: #fee2e2; border: 3px solid #dc2626; color: #991b1b; }
+    .product-visual { text-align: center; margin: 8px 0 4px; }
+    .product-name { font-size: 20px; font-weight: bold; text-align: center; margin: 6px 0 2px; }
+    .product-code { font-size: 16px; font-weight: bold; text-align: center; color: #1d4ed8; letter-spacing: 2px; }
+    .spec { font-size: 15px; line-height: 1.7; background: #f4f4f2; border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
+    .vs { display: flex; gap: 10px; margin-top: 10px; }
+    .vs .col { flex: 1; border: 2px solid #d9d9d7; border-radius: 12px; padding: 10px; text-align: center; }
+    .vs .col.rival { border-color: #dc2626; background: #fff7f7; }
+    .vs .col .nm { font-size: 14px; font-weight: bold; line-height: 1.4; }
+    .vs .col .cd { font-size: 15px; font-weight: bold; letter-spacing: 1px; }
+    .diff-list { margin: 12px 0 0; padding: 0; list-style: none; }
+    .diff-list li {
+        font-size: 16px; line-height: 1.5; padding: 10px 12px; margin-bottom: 8px;
+        background: #fef9c3; border: 2px solid #eab308; border-radius: 10px;
+    }
+    .diff-list li b { color: #991b1b; }
+    .check-list { margin: 12px 0 0; padding: 0; list-style: none; }
+    .check-list li { margin-bottom: 8px; }
+    .check-list label {
+        display: flex; align-items: center; gap: 10px; font-size: 16px; line-height: 1.5;
+        background: #f4f4f2; border: 2px solid #d9d9d7; border-radius: 10px; padding: 12px; cursor: pointer;
+    }
+    .check-list input { width: 24px; height: 24px; flex: none; }
+    .check-list label.checked { background: #dcfce7; border-color: #16a34a; }
+    .hidden { display: none !important; }
+    .done-mark { font-size: 44px; text-align: center; }
+    .pair-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .pair-table th, .pair-table td { border: 1px solid #d9d9d7; padding: 8px; text-align: left; line-height: 1.5; }
+    .pair-table th { background: #f4f4f2; }
+    .pair-table .cd { font-weight: bold; letter-spacing: 1px; white-space: nowrap; }
+    .backlink { display: inline-block; margin-bottom: 12px; color: #1d4ed8; font-weight: bold; text-decoration: none; font-size: 15px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <a class="backlink" href="index.html">‹ テストルームへ戻る</a>
+    <h1>商品コード照合チェック</h1>
+    <p class="sub">注文書（原文）のコードと指示書のコードを照合し、似た商品との違いを確認してから作成に入るための試作です。お客様情報は入力しません（商品コードのみ）。</p>
+
+    <div class="sample-note">⚠ 試作版：商品マスターはサンプルデータです。実データ（コード・写真・違いメモ）に差し替えて使います。写真の代わりに模式イラストを表示しています。</div>
+
+    <div class="steps">
+        <div class="step-chip on" id="chip1">1 原文コード</div>
+        <div class="step-chip" id="chip2">2 指示書と照合</div>
+        <div class="step-chip" id="chip3">3 違いを確認</div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="card" id="card1">
+        <h2>1. 注文書（原文）のコード</h2>
+        <p class="hint">指示書はまだ見ないでください。注文書（原文）だけを見て、商品コードを入力してください。下の候補からタップでも選べます。</p>
+        <input class="code-input" id="origInput" type="text" autocomplete="off" autocapitalize="characters" placeholder="例：FCA-003">
+        <div class="candidates" id="origCand"></div>
+        <p class="notfound" id="origNotFound">マスターにないコードです。原文をもう一度見てください。</p>
+        <div class="code-echo" id="origEcho">
+            <div class="label">入力したコード（原文と見比べてください）</div>
+            <div class="chars" id="origChars"></div>
+            <div class="pair-note" id="origPairNote"></div>
+        </div>
+        <button class="btn" id="toStep2" disabled>次へ（指示書と照合）</button>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="card hidden" id="card2">
+        <h2>2. 指示書のコードと照合</h2>
+        <p class="hint">次に、指示書に印刷された商品コードを入力してください。原文のコードと自動で照合します。</p>
+        <input class="code-input" id="sheetInput" type="text" autocomplete="off" autocapitalize="characters" placeholder="指示書のコード">
+        <div class="candidates" id="sheetCand"></div>
+        <p class="notfound" id="sheetNotFound">マスターにないコードです。指示書をもう一度見てください。</p>
+        <div class="verdict" id="verdict"></div>
+        <div id="ngDetail" class="hidden"></div>
+        <button class="btn" id="toStep3" disabled>商品の確認へ進む</button>
+        <button class="btn ghost" id="backTo1">‹ 原文コードを直す</button>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="card hidden" id="card3">
+        <h2>3. 作る商品と「違い」の確認</h2>
+        <div class="product-visual" id="pVisual"></div>
+        <div class="product-name" id="pName"></div>
+        <div class="product-code" id="pCode"></div>
+        <div class="spec" id="pSpec"></div>
+        <div id="pairArea"></div>
+        <ul class="check-list" id="checkList"></ul>
+        <button class="btn" id="startWork" disabled>この内容で作成をはじめる</button>
+        <button class="btn ghost" id="backTo2">‹ 照合に戻る</button>
+    </div>
+
+    <!-- DONE -->
+    <div class="card hidden" id="cardDone">
+        <div class="done-mark">✅</div>
+        <div class="product-name">照合OK・作成開始</div>
+        <div class="spec" id="doneSummary"></div>
+        <button class="btn" id="resetAll">次の注文を照合する</button>
+    </div>
+
+    <!-- PAIRS -->
+    <div class="card">
+        <h2>似たコード注意表（サンプル）</h2>
+        <p class="hint">間違えやすいペアと、現場で見分けるポイントの一覧です。</p>
+        <table class="pair-table">
+            <thead><tr><th>ペア</th><th>見分けるポイント</th></tr></thead>
+            <tbody id="pairTable"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+'use strict';
+/* ===== 商品マスター（サンプル） =====
+   実運用ではコード・商品名・仕様・写真・違いメモを実データに差し替える。
+   pair: 間違えやすい相手のコード / diffs: 見分けるポイント（現場の言葉で） */
+const PRODUCTS = [
+  { code:'FCA-003', name:'供花スタンド「あかり」一段・白系', spec:'ユリ3本／白菊／白カーネーション／リボン：白', ribbon:'#f8fafc', ribbonLabel:'白', main:'#ffffff', sub:'#fef08a', lilies:3, tiers:1, pair:'FCB-003' },
+  { code:'FCB-003', name:'供花スタンド「あかり」一段・ピンク系', spec:'ユリ5本／ピンクカーネーション／トルコキキョウ／リボン：ピンク', ribbon:'#f9a8d4', ribbonLabel:'ピンク', main:'#fbcfe8', sub:'#ffffff', lilies:5, tiers:1, pair:'FCA-003' },
+  { code:'SRD-120', name:'供花スタンド 二段・高さ120cm', spec:'二段構成／ユリ4本／胡蝶蘭1本／高さ120cm', ribbon:'#f8fafc', ribbonLabel:'白', main:'#ffffff', sub:'#ddd6fe', lilies:4, tiers:2, pair:'SRD-102' },
+  { code:'SRD-102', name:'供花スタンド 二段・高さ102cm', spec:'二段構成／ユリ2本／胡蝶蘭なし／高さ102cm', ribbon:'#f8fafc', ribbonLabel:'白', main:'#ffffff', sub:'#ddd6fe', lilies:2, tiers:2, pair:'SRD-120' },
+  { code:'KHB-014', name:'枕花アレンジ「やすらぎ」・青系', spec:'デルフィニウム中心／青・白系／かご：丸型', ribbon:'#93c5fd', ribbonLabel:'青', main:'#bfdbfe', sub:'#ffffff', lilies:0, tiers:0, pair:'KHB-041' },
+  { code:'KHB-041', name:'枕花アレンジ「やすらぎ」・紫系', spec:'トルコキキョウ中心／紫・白系／かご：角型', ribbon:'#c4b5fd', ribbonLabel:'紫', main:'#ddd6fe', sub:'#ffffff', lilies:0, tiers:0, pair:'KHB-014' },
+  { code:'FCA-007', name:'供花スタンド「あかり」一段・黄系', spec:'ユリ3本／黄菊／ひまわり（季節）／リボン：白', ribbon:'#f8fafc', ribbonLabel:'白', main:'#fef08a', sub:'#ffffff', lilies:3, tiers:1, pair:null },
+  { code:'THB-500', name:'祭壇脇花 一対セット', spec:'左右一対／白・グリーン系／高さ90cm', ribbon:'#f8fafc', ribbonLabel:'白', main:'#ffffff', sub:'#bbf7d0', lilies:0, tiers:2, pair:null }
+];
+const PAIR_DIFFS = {
+  'FCA-003|FCB-003': ['リボンの色：FCAは白／FCBはピンク', 'ユリの本数：FCAは3本／FCBは5本', '中心の花：FCAは白菊／FCBはピンクカーネーション'],
+  'SRD-120|SRD-102': ['高さ：120は120cm／102は102cm（約1頭身分ちがう）', '胡蝶蘭：120は1本あり／102はなし', 'ユリの本数：120は4本／102は2本'],
+  'KHB-014|KHB-041': ['色の系統：014は青系／041は紫系', '中心の花：014はデルフィニウム／041はトルコキキョウ', 'かごの形：014は丸型／041は角型']
+};
+const byCode = {};
+PRODUCTS.forEach(p => { byCode[p.code] = p; });
+
+function diffsFor(a, b) {
+  return PAIR_DIFFS[a + '|' + b] || PAIR_DIFFS[b + '|' + a] || [];
+}
+function diffCharIdx(a, b) {
+  const idx = [];
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i++) { if (a[i] !== b[i]) idx.push(i); }
+  return idx;
+}
+/* 模式イラスト（実運用では商品写真に差し替え） */
+function svgFor(p, w) {
+  const width = w || 200, height = 170;
+  let flowers = '';
+  const cols = [p.main, p.sub, p.main, p.sub, p.main];
+  for (let i = 0; i < 5; i++) {
+    const cx = 45 + i * 27, cy = p.tiers === 2 ? 52 : 62;
+    flowers += '<circle cx="' + cx + '" cy="' + cy + '" r="17" fill="' + cols[i] + '" stroke="#9ca3af" stroke-width="1.5"/>';
+  }
+  if (p.tiers === 2) {
+    for (let i = 0; i < 4; i++) {
+      const cx = 58 + i * 28;
+      flowers += '<circle cx="' + cx + '" cy="92" r="13" fill="' + (i % 2 ? p.main : p.sub) + '" stroke="#9ca3af" stroke-width="1.5"/>';
+    }
+  }
+  let lilies = '';
+  for (let i = 0; i < p.lilies; i++) {
+    const cx = 62 + i * 20, cy = 30;
+    lilies += '<path d="M' + cx + ' ' + cy + ' l6 -13 l3 12 l10 -6 l-7 11 l11 3 l-12 3 l6 10 l-9 -7 l-2 12 l-4 -12 l-10 6 l6 -10 l-11 -2 l11 -4 z" fill="#ffffff" stroke="#9ca3af" stroke-width="1"/>';
+  }
+  const stand = p.tiers === 0
+    ? '<rect x="55" y="105" width="90" height="34" rx="8" fill="#d6b48c" stroke="#9ca3af" stroke-width="1.5"/>'
+    : '<path d="M70 150 L92 84 L108 84 L130 150 Z" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1.5"/>';
+  const ribbon = '<rect x="86" y="' + (p.tiers === 0 ? 96 : 108) + '" width="28" height="13" rx="4" fill="' + p.ribbon + '" stroke="#9ca3af" stroke-width="1.5"/>';
+  return '<svg width="' + width + '" height="' + height + '" viewBox="0 0 200 170" role="img" aria-label="' + p.name + '">' + stand + flowers + lilies + ribbon + '</svg>';
+}
+
+const $ = id => document.getElementById(id);
+const state = { orig: null, sheet: null };
+
+function renderCandidates(el, prefix, onPick) {
+  el.innerHTML = '';
+  PRODUCTS.filter(p => !prefix || p.code.startsWith(prefix)).slice(0, 8).forEach(p => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'cand'; b.textContent = p.code;
+    b.addEventListener('click', () => onPick(p.code));
+    el.appendChild(b);
+  });
+}
+function echoCode(el, code, rivalCode) {
+  const diffIdx = rivalCode ? diffCharIdx(code, rivalCode) : [];
+  el.innerHTML = code.split('').map((ch, i) =>
+    diffIdx.includes(i) ? '<span class="diff-char">' + ch + '</span>' : '<span>' + ch + '</span>'
+  ).join('');
+}
+
+/* ===== STEP 1 ===== */
+function setOrig(code) {
+  code = (code || '').toUpperCase().trim();
+  $('origInput').value = code;
+  const p = byCode[code];
+  state.orig = p || null;
+  $('origNotFound').style.display = (!p && code.length >= 3) ? 'block' : 'none';
+  $('origEcho').style.display = p ? 'block' : 'none';
+  if (p) {
+    echoCode($('origChars'), p.code, p.pair);
+    $('origPairNote').textContent = p.pair
+      ? '⚠ ' + p.pair + ' と間違えやすいコードです（赤字が違う文字）'
+      : '';
+  }
+  renderCandidates($('origCand'), code, c => { setOrig(c); });
+  $('toStep2').disabled = !p;
+}
+$('origInput').addEventListener('input', e => setOrig(e.target.value));
+$('toStep2').addEventListener('click', () => {
+  $('card1').classList.add('hidden');
+  $('card2').classList.remove('hidden');
+  $('chip1').className = 'step-chip done';
+  $('chip2').className = 'step-chip on';
+  renderCandidates($('sheetCand'), '', c => setSheet(c));
+  window.scrollTo({ top: 0 });
+});
+
+/* ===== STEP 2 ===== */
+function setSheet(code) {
+  code = (code || '').toUpperCase().trim();
+  $('sheetInput').value = code;
+  const p = byCode[code];
+  state.sheet = p || null;
+  $('sheetNotFound').style.display = (!p && code.length >= 3) ? 'block' : 'none';
+  renderCandidates($('sheetCand'), code, c => setSheet(c));
+  const v = $('verdict');
+  v.className = 'verdict';
+  $('ngDetail').classList.add('hidden');
+  $('toStep3').disabled = true;
+  if (!p || !state.orig) return;
+  if (p.code === state.orig.code) {
+    v.className = 'verdict ok';
+    v.textContent = '✓ 一致：原文も指示書も ' + p.code + ' です。';
+    $('toStep3').disabled = false;
+  } else {
+    v.className = 'verdict ng';
+    v.textContent = '✕ 不一致！ 原文は ' + state.orig.code + '、指示書は ' + p.code + ' です。作成を止めて、上長に確認してください。';
+    const diffs = diffsFor(state.orig.code, p.code);
+    $('ngDetail').innerHTML =
+      '<div class="vs">' +
+      '<div class="col"><div class="cd">' + state.orig.code + '</div>' + svgFor(state.orig, 130) + '<div class="nm">' + state.orig.name + '<br>（原文）</div></div>' +
+      '<div class="col rival"><div class="cd">' + p.code + '</div>' + svgFor(p, 130) + '<div class="nm">' + p.name + '<br>（指示書）</div></div>' +
+      '</div>' +
+      (diffs.length ? '<ul class="diff-list">' + diffs.map(d => '<li>' + d + '</li>').join('') + '</ul>' : '');
+    $('ngDetail').classList.remove('hidden');
+  }
+}
+$('sheetInput').addEventListener('input', e => setSheet(e.target.value));
+$('backTo1').addEventListener('click', () => {
+  $('card2').classList.add('hidden');
+  $('card1').classList.remove('hidden');
+  $('chip1').className = 'step-chip on';
+  $('chip2').className = 'step-chip';
+  window.scrollTo({ top: 0 });
+});
+$('toStep3').addEventListener('click', () => {
+  buildStep3();
+  $('card2').classList.add('hidden');
+  $('card3').classList.remove('hidden');
+  $('chip2').className = 'step-chip done';
+  $('chip3').className = 'step-chip on';
+  window.scrollTo({ top: 0 });
+});
+
+/* ===== STEP 3 ===== */
+function buildStep3() {
+  const p = state.orig;
+  $('pVisual').innerHTML = svgFor(p, 210);
+  $('pName').textContent = p.name;
+  $('pCode').textContent = p.code;
+  $('pSpec').textContent = '仕様：' + p.spec;
+  const area = $('pairArea');
+  const list = $('checkList');
+  list.innerHTML = '';
+  $('startWork').disabled = true;
+  if (p.pair && byCode[p.pair]) {
+    const r = byCode[p.pair];
+    const diffs = diffsFor(p.code, r.code);
+    area.innerHTML =
+      '<div class="vs">' +
+      '<div class="col"><div class="cd">' + p.code + '</div>' + svgFor(p, 130) + '<div class="nm">' + p.name + '<br>（作るのはこちら）</div></div>' +
+      '<div class="col rival"><div class="cd">' + r.code + '</div>' + svgFor(r, 130) + '<div class="nm">' + r.name + '<br>（間違えやすい相手）</div></div>' +
+      '</div>' +
+      '<p class="hint" style="margin-top:12px;">見分けるポイントを確認したら、チェックを入れてください。</p>' +
+      '<ul class="diff-list">' + diffs.map(d => '<li>' + d + '</li>').join('') + '</ul>';
+    diffs.forEach((d, i) => {
+      const li = document.createElement('li');
+      const label = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.id = 'chk' + i;
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode('確認した：' + d));
+      cb.addEventListener('change', () => {
+        label.classList.toggle('checked', cb.checked);
+        const all = list.querySelectorAll('input[type=checkbox]');
+        $('startWork').disabled = ![...all].every(x => x.checked);
+      });
+      li.appendChild(label);
+      list.appendChild(li);
+    });
+  } else {
+    area.innerHTML = '<p class="hint" style="margin-top:12px;">この商品に間違えやすいペアは登録されていません。仕様どおりか最終確認してください。</p>';
+    const li = document.createElement('li');
+    const label = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode('確認した：写真・仕様と作る内容が合っている'));
+    cb.addEventListener('change', () => {
+      label.classList.toggle('checked', cb.checked);
+      $('startWork').disabled = !cb.checked;
+    });
+    li.appendChild(label);
+    list.appendChild(li);
+  }
+}
+$('backTo2').addEventListener('click', () => {
+  $('card3').classList.add('hidden');
+  $('card2').classList.remove('hidden');
+  $('chip2').className = 'step-chip on';
+  $('chip3').className = 'step-chip';
+  window.scrollTo({ top: 0 });
+});
+$('startWork').addEventListener('click', () => {
+  $('card3').classList.add('hidden');
+  $('cardDone').classList.remove('hidden');
+  $('chip3').className = 'step-chip done';
+  $('doneSummary').textContent = '商品：' + state.orig.code + ' ' + state.orig.name + '／仕様：' + state.orig.spec + '（原文コードと指示書コードの一致を確認済み）';
+  window.scrollTo({ top: 0 });
+});
+$('resetAll').addEventListener('click', () => location.reload());
+
+/* ===== 注意表 ===== */
+(function renderPairs() {
+  const seen = new Set();
+  const rows = [];
+  PRODUCTS.forEach(p => {
+    if (!p.pair || seen.has(p.code)) return;
+    seen.add(p.code); seen.add(p.pair);
+    const diffs = diffsFor(p.code, p.pair);
+    rows.push('<tr><td class="cd">' + p.code + '<br>↔ ' + p.pair + '</td><td>' + diffs.join('<br>') + '</td></tr>');
+  });
+  $('pairTable').innerHTML = rows.join('');
+})();
+
+setOrig('');
+</script>
+</body>
+</html>
