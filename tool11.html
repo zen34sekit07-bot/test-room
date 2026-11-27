@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>シフト希望・公休管理（試作）</title>
+<meta name="theme-color" content="#f4f4f2">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<script>
+    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
+</script>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        margin: 0; background-color: #eeeeec; color: #262626;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+        font-size: 16px; min-height: 100dvh;
+    }
+    .wrap { max-width: 640px; margin: 0 auto; padding: 16px 12px 90px; }
+    h1 { font-size: 21px; font-weight: bold; margin: 4px 0 4px; border-left: 6px solid #2563eb; padding-left: 10px; }
+    h2.sec { font-size: 18px; margin: 18px 0 8px; border-left: 5px solid #2563eb; padding-left: 8px; }
+    .sub { color: #555555; font-size: 14px; margin: 0 0 12px 16px; line-height: 1.5; }
+    .sample-note { background: #fef9c3; border: 2px solid #eab308; border-radius: 10px; padding: 10px 12px; font-size: 14px; line-height: 1.5; margin-bottom: 14px; }
+    .backlink { display: inline-block; margin-bottom: 10px; color: #1d4ed8; font-weight: bold; text-decoration: none; font-size: 15px; }
+    .card { background: #ffffff; border: 2px solid #d9d9d7; border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+    .userbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .userbar select { font-size: 16px; padding: 10px; border: 2px solid #262626; border-radius: 10px; background: #ffffff; flex: 1; min-width: 150px; }
+    .tabs { position: fixed; left: 0; right: 0; bottom: 0; background: #ffffff; border-top: 2px solid #d9d9d7; display: flex; z-index: 40; }
+    .tabs button { flex: 1; background: none; border: none; font-size: 13px; font-weight: bold; color: #555555; padding: 10px 2px 14px; cursor: pointer; }
+    .tabs button.on { color: #1d4ed8; box-shadow: inset 0 3px 0 #2563eb; }
+    .monthbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .monthbar .mtitle { font-size: 20px; font-weight: bold; flex: 1; text-align: center; }
+    .mnav { font-size: 16px; font-weight: bold; background: #ffffff; border: 2px solid #2563eb; color: #1d4ed8; border-radius: 10px; padding: 8px 14px; cursor: pointer; }
+    .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .cal .dow { text-align: center; font-size: 13px; font-weight: bold; color: #555555; padding: 4px 0; }
+    .cal .dow.sun { color: #dc2626; } .cal .dow.sat { color: #1d4ed8; }
+    .cell { background: #ffffff; border: 2px solid #d9d9d7; border-radius: 10px; min-height: 88px; padding: 4px; cursor: pointer; position: relative; }
+    .cell.today { border-color: #2563eb; box-shadow: 0 0 0 2px #93c5fd; }
+    .cell .dnum { font-size: 15px; font-weight: bold; }
+    .cell .rokuyo { display: block; font-size: 10px; color: #6f6f6f; white-space: nowrap; }
+    .cell .busy { position: absolute; top: 3px; right: 5px; font-size: 15px; font-weight: bold; }
+    .busy-calm { color: #16a34a; } .busy-mid { color: #d97706; } .busy-busy { color: #dc2626; }
+    .cell .duty { font-size: 9px; line-height: 1.35; color: #1d4ed8; }
+    .cell .duty .pn { display: inline-block; white-space: nowrap; }
+    .cell .offc { font-size: 9px; line-height: 1.35; color: #555555; white-space: nowrap; }
+    .cell .mine { font-size: 10px; font-weight: bold; line-height: 1.3; }
+    .cell.conflict { border-color: #dc2626; background: #fff7f7; }
+    .legend { font-size: 13px; color: #555555; line-height: 1.7; margin-top: 8px; }
+    .btn { display: block; width: 100%; font-size: 17px; font-weight: bold; padding: 13px; border-radius: 12px; border: none; cursor: pointer; margin-top: 10px; background: #2563eb; color: #ffffff; }
+    .btn:disabled { background: #b6c6e8; }
+    .btn.ghost { background: #ffffff; color: #1d4ed8; border: 2px solid #2563eb; }
+    .btn.danger { background: #dc2626; color: #ffffff; }
+    .btn.small { width: auto; display: inline-block; font-size: 14px; padding: 8px 14px; margin-top: 0; }
+    .warn { background: #fef9c3; border: 2px solid #eab308; border-radius: 10px; padding: 12px; font-size: 15px; line-height: 1.6; margin: 10px 0; }
+    .warn.red { background: #fee2e2; border-color: #dc2626; }
+    .okbox { background: #dcfce7; border: 2px solid #16a34a; border-radius: 10px; padding: 12px; font-size: 15px; line-height: 1.6; margin: 10px 0; }
+    .sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 50; display: none; }
+    .sheet { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); width: min(94vw, 520px); max-height: 88dvh; overflow-y: auto; background: #ffffff; border-radius: 16px; padding: 18px; z-index: 51; display: none; }
+    .sheet.open, .sheet-bg.open { display: block; }
+    .sheet h3 { font-size: 19px; margin: 0 0 8px; }
+    .kv { font-size: 15px; line-height: 1.7; }
+    .kv b { color: #1d4ed8; }
+    table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.tbl th, table.tbl td { border: 1px solid #d9d9d7; padding: 6px 4px; text-align: center; }
+    table.tbl th { background: #f4f4f2; }
+    table.tbl td.name, table.tbl th.name { text-align: left; font-weight: bold; white-space: nowrap; }
+    .tblwrap { overflow-x: auto; }
+    label.f { display: block; font-size: 14px; font-weight: bold; margin: 12px 0 6px; }
+    input.t, select.t { width: 100%; font-size: 16px; padding: 10px; border: 2px solid #262626; border-radius: 10px; background: #ffffff; }
+    .chkrow { display: flex; gap: 6px; flex-wrap: wrap; }
+    .chkrow label { display: flex; align-items: center; gap: 4px; font-size: 15px; font-weight: bold; background: #f4f4f2; border: 2px solid #d9d9d7; border-radius: 999px; padding: 7px 12px; cursor: pointer; }
+    .chkrow input { width: 18px; height: 18px; }
+    .chkrow label:has(input:checked) { background: #dbeafe; border-color: #2563eb; }
+    .mrow { border: 2px solid #d9d9d7; border-radius: 12px; padding: 12px; margin-bottom: 10px; background: #ffffff; }
+    .mrow .nm { font-size: 17px; font-weight: bold; }
+    .mrow .meta { font-size: 13px; color: #555555; line-height: 1.6; }
+    .pill { display: inline-block; font-size: 12px; font-weight: bold; border-radius: 999px; padding: 2px 9px; background: #dbeafe; color: #1d4ed8; margin-right: 4px; }
+    .pill.gray { background: #e5e7eb; color: #374151; }
+    .pill.red { background: #fee2e2; color: #991b1b; }
+    .hidden { display: none !important; }
+    .rules p, .rules li { font-size: 15px; line-height: 1.7; }
+    .conflict-item { border: 2px solid #dc2626; background: #fff7f7; border-radius: 12px; padding: 12px; margin-bottom: 10px; font-size: 15px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <a class="backlink" href="index.html">‹ テストルームへ戻る</a>
+    <h1>シフト希望・公休管理</h1>
+    <p class="sub">公休9日ルール・六曜による混雑表示・希望の競合と抽選・有給の記録に対応した試作です。</p>
+    <div class="sample-note">⚠ 試作版：メンバー22人はサンプルデータで、この端末の中だけに保存されます。実運用では共有の保存先（GAS等）に接続します。</div>
+
+    <div class="card">
+        <div class="userbar">
+            <span style="font-weight:bold;">利用者：</span>
+            <select id="userSelect"></select>
+        </div>
+        <div id="mySummary" style="margin-top:10px;"></div>
+    </div>
+
+    <div id="view-cal"></div>
+    <div id="view-mine" class="hidden"></div>
+    <div id="view-leave" class="hidden"></div>
+    <div id="view-rules" class="hidden"></div>
+    <div id="view-admin" class="hidden"></div>
+</div>
+
+<div class="tabs">
+    <button data-tab="cal" class="on">カレンダー</button>
+    <button data-tab="mine">自分の状況</button>
+    <button data-tab="leave">有給管理</button>
+    <button data-tab="rules">ルール</button>
+    <button data-tab="admin" id="tabAdmin">管理者</button>
+</div>
+
+<div class="sheet-bg" id="sheetBg"></div>
+<div class="sheet" id="daySheet"></div>
+
+<script>
+'use strict';
+/* ================= データ ================= */
+const LS_KEY = 'tool11_shift_v1';
+const LS_USER = 'tool11_user';
+const WD = ['日','月','火','水','木','金','土'];
+
+function seedDB() {
+  const types = [
+    { id:'seishain', name:'正社員', kokyu:true,  warnOver:true,  toban:true,  yukyu:true,  yukyuGrant:20 },
+    { id:'keiyaku',  name:'契約社員', kokyu:true,  warnOver:true,  toban:false, yukyu:true,  yukyuGrant:15 },
+    { id:'part',     name:'パート・アルバイト', kokyu:false, warnOver:false, toban:false, yukyu:true, yukyuGrant:10 },
+    { id:'itaku',    name:'業務委託', kokyu:false, warnOver:false, toban:false, yukyu:false, yukyuGrant:0 }
+  ];
+  // fixedOff: 定休の曜日(0=日..6=土) / null=固定なし（希望ベース）
+  const M = (id,name,type,dept,fixedOff,early,late) => ({ id, name, type, dept, fixedOff, tobanEarly:early||[], tobanLate:late||[], loseCount:0, active:true });
+  const members = [
+    M('m01','関 貴文','seishain','施工課',[1,2],[0],[5]),
+    M('m02','佐藤 健一','seishain','施工課',[1,3],[1],[2]),
+    M('m03','鈴木 翔太','seishain','施工課',[2,4],[2],[3]),
+    M('m04','高橋 大輔','seishain','施工課',[1,2],[3],[4]),
+    M('m05','田中 美咲','seishain','施工課',[3,5],[4],[0]),
+    M('m06','伊藤 直樹','seishain','施工課',[1,4],[5],[1]),
+    M('m07','渡辺 葵','seishain','施工課',[2,3],[6],[6]),
+    M('m08','山本 蓮','seishain','施工課',[1,5],[0],[0]),
+    M('m09','中村 悠','seishain','施工課',[4,5],[1],[5]),
+    M('m10','小林 駿','seishain','施工課',[1,2],[2],[1]),
+    M('m11','橋場 誠','seishain','生産管理課',[1,3],[],[]),
+    M('m12','加藤 里奈','seishain','生産管理課',[2,4],[],[]),
+    M('m13','吉田 拓海','seishain','生産管理課',[1,2],[],[]),
+    M('m14','山田 花','keiyaku','施工課',[1,2],[],[]),
+    M('m15','松本 樹','keiyaku','施工課',[3,4],[],[]),
+    M('m16','井上 凛','keiyaku','施工課',[1,5],[],[]),
+    M('m17','木村 春樹','part','施工課',[1,2],[],[]),
+    M('m18','林 さくら','part','施工課',[4,5],[],[]),
+    M('m19','清水 結衣','part','施工課',null,[],[]),
+    M('m20','森 健太','part','施工課',null,[],[]),
+    M('m21','運送・岡田','itaku','運送',[0,1,2,4,5,6],[],[]),
+    M('m22','運送・西村','itaku','運送',[0,1,3,4,5,6],[],[])
+  ];
+  return {
+    types, members,
+    requests: [],       // {id, memberId, date, kind:'kibou'|'yukyu'|'cut', status:'pending'|'confirmed'|'lost'|'auto', note}
+    busyOverride: {},   // date -> 'calm'|'mid'|'busy'
+    settings: { capacity: { calm:3, mid:2, busy:1 }, deadlineDay:25, discussDay:27, lotteryDay:28, kokyuTarget:9 },
+    lotteryLog: []      // {at, date, winners:[], losers:[]}
+  };
+}
+let DB;
+try { DB = JSON.parse(localStorage.getItem(LS_KEY)) || seedDB(); } catch(e) { DB = seedDB(); }
+function save() { localStorage.setItem(LS_KEY, JSON.stringify(DB)); }
+save();
+
+const typeOf = m => DB.types.find(t => t.id === m.type) || DB.types[0];
+const memberOf = id => DB.members.find(m => m.id === id);
+function isAdmin() { return currentUserId === 'admin'; }
+let currentUserId = localStorage.getItem(LS_USER) || 'm01';
+if (currentUserId !== 'admin' && !memberOf(currentUserId)) currentUserId = 'm01';
+function me() { return isAdmin() ? null : memberOf(currentUserId); }
+
+/* ================= 日付・六曜 ================= */
+const pad = n => String(n).padStart(2,'0');
+const dstr = (y,m,d) => y + '-' + pad(m) + '-' + pad(d);
+function parseD(s) { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
+function monthDates(y, m) {
+  const last = new Date(y, m, 0).getDate();
+  const arr = [];
+  for (let d = 1; d <= last; d++) arr.push(dstr(y, m, d));
+  return arr;
+}
+const ROKUYO = ['大安','赤口','先勝','友引','先負','仏滅'];
+function rokuyoOf(dateStr) {
+  try {
+    const dt = parseD(dateStr);
+    const parts = new Intl.DateTimeFormat('en-u-ca-chinese', { month:'numeric', day:'numeric' }).formatToParts(dt);
+    let lm = 0, ld = 0;
+    for (const p of parts) { if (p.type === 'month') lm = parseInt(p.value, 10); if (p.type === 'day') ld = parseInt(p.value, 10); }
+    if (!lm || !ld) return null;
+    return ROKUYO[(lm + ld) % 6];
+  } catch(e) { return null; }
+}
+function busyLevel(dateStr) {
+  if (DB.busyOverride[dateStr]) return DB.busyOverride[dateStr];
+  const next = parseD(dateStr); next.setDate(next.getDate() + 1);
+  const nextStr = dstr(next.getFullYear(), next.getMonth()+1, next.getDate());
+  if (rokuyoOf(nextStr) === '友引') return 'busy';       // 友引の前日は葬儀が集中
+  if (rokuyoOf(dateStr) === '大安') return 'mid';
+  return 'calm';
+}
+const BUSY_MARK = { calm:'○', mid:'△', busy:'☓' };
+const BUSY_LABEL = { calm:'休みOK', mid:'忙しいかも', busy:'できれば休みをつけないで' };
+
+/* ================= 集計 ================= */
+function fixedOffDates(m, y, mo) {
+  if (!m.fixedOff) return [];
+  return monthDates(y, mo).filter(s => m.fixedOff.includes(parseD(s).getDay()));
+}
+function reqsOn(dateStr, kind) {
+  return DB.requests.filter(r => r.date === dateStr && (!kind || r.kind === kind) && r.status !== 'lost');
+}
+function kibouCount(dateStr) {
+  return DB.requests.filter(r => r.date === dateStr && r.kind === 'kibou' && (r.status === 'pending' || r.status === 'confirmed')).length;
+}
+function isConflict(dateStr) {
+  return kibouCount(dateStr) > DB.settings.capacity[busyLevel(dateStr)];
+}
+function myReq(memberId, dateStr, kind) {
+  return DB.requests.find(r => r.memberId === memberId && r.date === dateStr && r.kind === kind && r.status !== 'lost');
+}
+function kokyuInfo(m, y, mo) {
+  // 公休ルールの状態を返す（対象外は null）
+  const t = typeOf(m);
+  if (!t.kokyu) return null;
+  const fixed = fixedOffDates(m, y, mo);
+  const target = DB.settings.kokyuTarget;
+  const cuts = DB.requests.filter(r => r.memberId === m.id && r.kind === 'cut' && monthDates(y,mo).includes(r.date)).length;
+  const autos = DB.requests.filter(r => r.memberId === m.id && r.kind === 'yukyu' && r.status === 'auto' && monthDates(y,mo).includes(r.date)).length;
+  const kibouUsed = DB.requests.filter(r => r.memberId === m.id && r.kind === 'kibou' && monthDates(y,mo).includes(r.date) && r.status !== 'lost').length;
+  const effective = fixed.length - cuts - autos + kibouUsed;
+  return { fixedCount: fixed.length, target, shortage: Math.max(0, target - fixed.length), over: Math.max(0, fixed.length - target), cuts, autos, kibouUsed, effective };
+}
+function yukyuUsed(memberId, y, mo) {
+  // 有給消化：確定した有給希望＋公休超過の自動有給
+  return DB.requests.filter(r => {
+    if (r.memberId !== memberId || r.kind !== 'yukyu') return false;
+    if (r.status !== 'confirmed' && r.status !== 'auto') return false;
+    if (y && mo) { const d = parseD(r.date); return d.getFullYear() === y && d.getMonth()+1 === mo; }
+    if (y) { return parseD(r.date).getFullYear() === y; }
+    return true;
+  }).length;
+}
+function dutyOn(dateStr) {
+  const wd = parseD(dateStr).getDay();
+  const early = DB.members.filter(m => m.active && m.tobanEarly.includes(wd)).map(m => m.name);
+  const late = DB.members.filter(m => m.active && m.tobanLate.includes(wd)).map(m => m.name);
+  return { early, late };
+}
+function myDuty(m, dateStr) {
+  const wd = parseD(dateStr).getDay();
+  const r = [];
+  if (m.tobanEarly.includes(wd)) r.push('早番');
+  if (m.tobanLate.includes(wd)) r.push('遅番');
+  return r;
+}
+
+/* ================= 画面状態 ================= */
+const nowD = new Date();
+let viewY = nowD.getFullYear(), viewM = nowD.getMonth() + 2; // 翌月
+if (viewM > 12) { viewM = 1; viewY++; }
+let currentTab = 'cal';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function renderUserBar() {
+  const sel = $('userSelect');
+  sel.innerHTML = DB.members.filter(m => m.active).map(m => '<option value="' + m.id + '"' + (m.id === currentUserId ? ' selected' : '') + '>' + esc(m.name) + '（' + esc(typeOf(m).name) + '・' + esc(m.dept) + '）</option>').join('')
+    + '<option value="admin"' + (isAdmin() ? ' selected' : '') + '>管理者</option>';
+  const s = $('mySummary');
+  const m = me();
+  if (!m) { s.innerHTML = '<span class="pill">管理者モード</span> メンバーの設定・競合の抽選・月の確定ができます。'; return; }
+  const ki = kokyuInfo(m, viewY, viewM);
+  let txt = '<span class="pill">' + esc(typeOf(m).name) + '</span><span class="pill gray">' + esc(m.dept) + '</span>';
+  if (ki) txt += ' ' + viewM + '月の公休：現在 ' + ki.effective + ' 日（目標 ' + ki.target + ' 日）';
+  if (typeOf(m).yukyu) txt += ' ／ 有給消化：' + viewY + '年 ' + yukyuUsed(m.id, viewY) + ' 日';
+  s.innerHTML = txt;
+}
+
+function renderCal() {
+  const el = $('view-cal');
+  const dates = monthDates(viewY, viewM);
+  const firstWd = parseD(dates[0]).getDay();
+  let h = '<div class="monthbar"><button class="mnav" id="prevM">‹ 前月</button><div class="mtitle">' + viewY + '年 ' + viewM + '月</div><button class="mnav" id="nextM">翌月 ›</button></div>';
+  h += '<div class="card" style="padding:10px;"><div class="cal">';
+  h += WD.map((w, i) => '<div class="dow' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '') + '">' + w + '</div>').join('');
+  for (let i = 0; i < firstWd; i++) h += '<div></div>';
+  const todayStr = dstr(nowD.getFullYear(), nowD.getMonth()+1, nowD.getDate());
+  const m = me();
+  for (const ds of dates) {
+    const d = parseD(ds);
+    const lv = busyLevel(ds);
+    const duty = dutyOn(ds);
+    const offNames = [];
+    DB.members.forEach(mm => { if (mm.active && mm.fixedOff && mm.fixedOff.includes(d.getDay())) offNames.push(mm.name.split(' ')[0]); });
+    reqsOn(ds, 'kibou').forEach(r => { const mm = memberOf(r.memberId); if (mm) offNames.push(mm.name.split(' ')[0] + '(希)'); });
+    reqsOn(ds, 'yukyu').forEach(r => { const mm = memberOf(r.memberId); if (mm) offNames.push(mm.name.split(' ')[0] + '(有)'); });
+    let mine = '';
+    if (m) {
+      if (m.fixedOff && m.fixedOff.includes(d.getDay())) {
+        const cut = myReq(m.id, ds, 'cut');
+        const auto = DB.requests.find(r => r.memberId === m.id && r.date === ds && r.kind === 'yukyu' && r.status === 'auto');
+        mine = auto ? '<div class="mine" style="color:#d97706;">有給(自動)</div>' : cut ? '<div class="mine" style="color:#dc2626;">出勤にする</div>' : '<div class="mine" style="color:#16a34a;">定休</div>';
+      } else if (myReq(m.id, ds, 'kibou')) mine = '<div class="mine" style="color:#1d4ed8;">希望休</div>';
+      else if (myReq(m.id, ds, 'yukyu')) mine = '<div class="mine" style="color:#7c3aed;">有給</div>';
+    }
+    h += '<div class="cell' + (ds === todayStr ? ' today' : '') + (isConflict(ds) ? ' conflict' : '') + '" data-date="' + ds + '">'
+      + '<span class="dnum">' + d.getDate() + '</span> <span class="rokuyo">' + (rokuyoOf(ds) || '') + '</span>'
+      + '<span class="busy busy-' + lv + '">' + BUSY_MARK[lv] + '</span>'
+      + (duty.early.length ? '<div class="duty">早:' + duty.early.map(n => '<span class="pn">' + n.split(' ')[0] + '</span>').join('・') + '</div>' : '')
+      + (duty.late.length ? '<div class="duty">遅:' + duty.late.map(n => '<span class="pn">' + n.split(' ')[0] + '</span>').join('・') + '</div>' : '')
+      + '<div class="offc">休' + offNames.length + '人 枠' + DB.settings.capacity[lv] + (isConflict(ds) ? ' <b style="color:#dc2626;">競合!</b>' : '') + '</div>'
+      + mine + '</div>';
+  }
+  h += '</div><div class="legend">○ 休みOK ／ △ 忙しいかも ／ ☓ できれば休みをつけないで（友引の前日は自動で☓）<br>枠＝その日に希望休を取れる人数。赤枠は希望が枠を超えた「競合」の日です。</div></div>';
+  el.innerHTML = h;
+  $('prevM').addEventListener('click', () => { viewM--; if (viewM < 1) { viewM = 12; viewY--; } renderAll(); });
+  $('nextM').addEventListener('click', () => { viewM++; if (viewM > 12) { viewM = 1; viewY++; } renderAll(); });
+  el.querySelectorAll('.cell').forEach(c => c.addEventListener('click', () => openDay(c.dataset.date)));
+}
+
+/* ================= 日シート ================= */
+function openDay(ds) {
+  const d = parseD(ds);
+  const lv = busyLevel(ds);
+  const duty = dutyOn(ds);
+  const m = me();
+  let h = '<h3>' + (d.getMonth()+1) + '月' + d.getDate() + '日（' + WD[d.getDay()] + '） ' + (rokuyoOf(ds) || '') + '</h3>';
+  h += '<div class="kv">混雑：<b class="busy-' + lv + '">' + BUSY_MARK[lv] + ' ' + BUSY_LABEL[lv] + '</b> ／ 希望休の枠：' + DB.settings.capacity[lv] + '人（現在 ' + kibouCount(ds) + '人）</div>';
+  h += '<div class="kv">当番：早番 ' + (duty.early.join('、') || 'なし') + ' ／ 遅番 ' + (duty.late.join('、') || 'なし') + '</div>';
+  const offList = [];
+  DB.members.forEach(mm => { if (mm.active && mm.fixedOff && mm.fixedOff.includes(d.getDay()) && !myReq(mm.id, ds, 'cut')) offList.push(esc(mm.name) + '（定休）'); });
+  reqsOn(ds, 'kibou').forEach(r => { const mm = memberOf(r.memberId); if (mm) offList.push(esc(mm.name) + '（希望休）'); });
+  reqsOn(ds, 'yukyu').forEach(r => { const mm = memberOf(r.memberId); if (mm) offList.push(esc(mm.name) + '（有給' + (r.status === 'auto' ? '・自動' : '') + '）'); });
+  h += '<div class="kv">休みの人：' + (offList.join('、') || 'なし') + '</div>';
+  if (isConflict(ds)) h += '<div class="warn red"><b>希望が枠を超えています（競合）。</b><br>' + DB.settings.discussDay + '日までに話し合って ' + DB.settings.capacity[lv] + ' 人に絞ってください。決まらない場合は ' + DB.settings.lotteryDay + ' 日にランダム抽選で決まります。</div>';
+
+  if (m) {
+    const t = typeOf(m);
+    const myDuties = myDuty(m, ds);
+    const isFixed = m.fixedOff && m.fixedOff.includes(d.getDay());
+    if (myDuties.length) h += '<div class="warn">⚠ この日はあなたの<b>' + myDuties.join('・') + '当番</b>です。休む場合は代わりを探すなど、事前に調整してください。</div>';
+    if (lv === 'busy') h += '<div class="warn">⚠ この日は「できれば休みをつけないで」の日です。</div>';
+    h += '<div style="margin-top:6px;">';
+    if (isFixed) {
+      const cut = myReq(m.id, ds, 'cut');
+      h += '<div class="kv">この日はあなたの定休日です。</div>';
+      if (t.kokyu) h += cut
+        ? '<button class="btn ghost" id="actUncut">「出勤にする」を取り消す</button>'
+        : '<button class="btn ghost" id="actCut">この日を「出勤にする」（公休を削る）</button>';
+    } else {
+      const kb = myReq(m.id, ds, 'kibou');
+      const yk = myReq(m.id, ds, 'yukyu');
+      if (kb) h += '<button class="btn danger" id="actDelKibou">希望休を取り消す</button>';
+      else h += '<button class="btn" id="actKibou">希望休を出す</button>';
+      if (t.yukyu) {
+        if (yk) h += '<button class="btn danger" id="actDelYukyu">有給を取り消す</button>';
+        else h += '<button class="btn ghost" id="actYukyu">有給を出す（別枠）</button>';
+      }
+    }
+    h += '</div>';
+  }
+  if (isAdmin()) {
+    h += '<h2 class="sec">管理者：この日の混雑を変更</h2><div class="chkrow" id="busyEdit">'
+      + ['calm','mid','busy'].map(k => '<label><input type="radio" name="busy" value="' + k + '"' + (lv === k ? ' checked' : '') + '> ' + BUSY_MARK[k] + ' ' + BUSY_LABEL[k] + '</label>').join('') + '</div>';
+  }
+  h += '<button class="btn ghost" id="closeSheet">閉じる</button>';
+  $('daySheet').innerHTML = h;
+  $('daySheet').classList.add('open');
+  $('sheetBg').classList.add('open');
+  $('closeSheet').addEventListener('click', closeDay);
+  if (m) {
+    const add = (kind) => () => { DB.requests.push({ id: 'r' + Date.now() + Math.floor(Math.random()*999), memberId: m.id, date: ds, kind, status: 'pending', note: '' }); save(); closeDay(); renderAll(); };
+    const del = (kind) => () => { DB.requests = DB.requests.filter(r => !(r.memberId === m.id && r.date === ds && r.kind === kind)); save(); closeDay(); renderAll(); };
+    if ($('actKibou')) $('actKibou').addEventListener('click', add('kibou'));
+    if ($('actDelKibou')) $('actDelKibou').addEventListener('click', del('kibou'));
+    if ($('actYukyu')) $('actYukyu').addEventListener('click', add('yukyu'));
+    if ($('actDelYukyu')) $('actDelYukyu').addEventListener('click', del('yukyu'));
+    if ($('actCut')) $('actCut').addEventListener('click', add('cut'));
+    if ($('actUncut')) $('actUncut').addEventListener('click', del('cut'));
+  }
+  if (isAdmin()) {
+    $('busyEdit').querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => {
+      DB.busyOverride[ds] = inp.value; save(); openDay(ds); renderCal();
+    }));
+  }
+}
+function closeDay() { $('daySheet').classList.remove('open'); $('sheetBg').classList.remove('open'); }
+$('sheetBg').addEventListener('click', closeDay);
+
+/* ================= 自分の状況 ================= */
+function renderMine() {
+  const el = $('view-mine');
+  const m = me();
+  if (!m) { el.innerHTML = '<div class="card">管理者モードでは「自分の状況」はありません。利用者を選んでください。</div>'; return; }
+  const t = typeOf(m);
+  const ki = kokyuInfo(m, viewY, viewM);
+  let h = '<div class="card"><h2 class="sec" style="margin-top:0;">' + esc(m.name) + 'さんの ' + viewY + '年' + viewM + '月</h2>';
+  if (ki) {
+    h += '<div class="kv">公休：定休 ' + ki.fixedCount + ' 日 ＋ 希望 ' + ki.kibouUsed + ' 日 － 削り ' + ki.cuts + ' 日 － 自動有給 ' + ki.autos + ' 日 ＝ <b>' + ki.effective + ' 日</b>（目標 ' + ki.target + ' 日）</div>';
+    if (ki.shortage > 0) {
+      const remain = ki.shortage - ki.kibouUsed;
+      h += remain > 0
+        ? '<div class="warn">公休が ' + ki.fixedCount + ' 日しかありません。あと <b>' + remain + ' 日</b>、希望休を出せます（カレンダーから日を選んでください）。希望が他の人と被った場合は話し合い→抽選になります。</div>'
+        : '<div class="okbox">不足分の希望は出し終わっています。</div>';
+    }
+    if (ki.over > 0) {
+      const needCut = ki.over - ki.cuts - ki.autos;
+      if (needCut > 0) {
+        const warnOverEff = t.warnOver && m.dept !== '生産管理課';
+        if (warnOverEff) h += '<div class="warn red">公休が' + (ki.target + ki.over) + '日設定されています。公休' + ki.target + '日にするにはどこか' + needCut + '日削ってください<br>※削らないと自動的に有給扱いとなります。</div>';
+        else h += '<div class="warn">公休が ' + (ki.target + ki.over) + ' 日あります。超過分 ' + needCut + ' 日は自動的に有給で処理されます。</div>';
+        h += '<div class="kv">削る日はカレンダーで自分の定休日をタップして「出勤にする」を選んでください。</div>';
+      } else h += '<div class="okbox">超過分の処理は済んでいます。</div>';
+    }
+    if (ki.shortage === 0 && ki.over === 0) h += '<div class="okbox">公休は ' + ki.target + ' 日でちょうど合っています。</div>';
+  } else {
+    h += '<div class="kv">' + esc(t.name) + ' は公休' + DB.settings.kokyuTarget + '日ルールの対象外です。</div>';
+  }
+  if (t.yukyu) {
+    h += '<div class="kv" style="margin-top:8px;">有給：今年の消化 <b>' + yukyuUsed(m.id, viewY) + ' 日</b> ／ 付与 ' + t.yukyuGrant + ' 日（目安）<br>月別：' + [1,2,3,4,5,6,7,8,9,10,11,12].map(mo => mo + '月 ' + yukyuUsed(m.id, viewY, mo) + '日').join(' ／ ') + '</div>';
+  }
+  const myReqs = DB.requests.filter(r => r.memberId === m.id && monthDates(viewY, viewM).includes(r.date)).sort((a,b) => a.date < b.date ? -1 : 1);
+  h += '<h2 class="sec">今月の希望・申請</h2>';
+  h += myReqs.length ? myReqs.map(r => {
+    const d = parseD(r.date);
+    const kindLabel = { kibou:'希望休', yukyu:'有給', cut:'出勤にする（公休を削る）' }[r.kind];
+    const st = r.status === 'lost' ? '（抽選で外れ）' : r.status === 'auto' ? '（自動）' : '';
+    return '<div class="kv">' + (d.getMonth()+1) + '/' + d.getDate() + '（' + WD[d.getDay()] + '）' + kindLabel + st + '</div>';
+  }).join('') : '<div class="kv">まだありません。カレンダーから日を選んで希望を出してください。</div>';
+  h += '</div>';
+  el.innerHTML = h;
+}
+
+/* ================= 有給管理 ================= */
+function renderLeave() {
+  const el = $('view-leave');
+  let h = '<div class="card"><h2 class="sec" style="margin-top:0;">有給の消化状況（' + viewY + '年）</h2><div class="tblwrap"><table class="tbl"><thead><tr><th class="name">名前</th>';
+  for (let mo = 1; mo <= 12; mo++) h += '<th>' + mo + '月</th>';
+  h += '<th>年間</th><th>付与</th></tr></thead><tbody>';
+  DB.members.filter(m => m.active && typeOf(m).yukyu).forEach(m => {
+    h += '<tr><td class="name">' + esc(m.name) + '</td>';
+    for (let mo = 1; mo <= 12; mo++) { const u = yukyuUsed(m.id, viewY, mo); h += '<td>' + (u || '・') + '</td>'; }
+    h += '<td><b>' + yukyuUsed(m.id, viewY) + '</b></td><td>' + typeOf(m).yukyuGrant + '</td></tr>';
+  });
+  h += '</tbody></table></div><div class="legend">有給希望が確定した分と、公休が多すぎた月の「自動有給」分を数えています。各人の月ごとの記録として残ります。</div></div>';
+  el.innerHTML = h;
+}
+
+/* ================= ルール ================= */
+function renderRules() {
+  const s = DB.settings;
+  $('view-rules').innerHTML = '<div class="card rules"><h2 class="sec" style="margin-top:0;">休日取得のルール</h2>'
+    + '<p><b>公休</b>：正社員・契約社員は月 ' + s.kokyuTarget + ' 日が基本です。週2日の定休で ' + s.kokyuTarget + ' 日に足りない月は、不足分を希望休として出せます。多すぎる月は、自分で日を選んで「出勤にする（削る）」か、有給に替えます。削らなかった分は自動的に有給扱いになります。</p>'
+    + '<p><b>生産管理課の正社員</b>：公休が多すぎる月は警告なく自動で有給処理されます。足りない月は警告が出ます。</p>'
+    + '<p><b>パート・アルバイト</b>：公休ルールの対象外です。有給はあります。<b>業務委託</b>：週1日の固定休みで、有給はありません。</p>'
+    + '<p><b>混雑表示</b>：○ 休みOK ／ △ 忙しいかも ／ ☓ できれば休みをつけないで。六曜（友引の前日など）から自動で付けます。その日に大きな予定がある場合は管理者が変更します。</p>'
+    + '<p><b>希望の枠</b>：○の日は ' + s.capacity.calm + ' 人、△の日は ' + s.capacity.mid + ' 人、☓の日は ' + s.capacity.busy + ' 人まで希望休を取れます。有給は別枠です。</p>'
+    + '<p><b>希望が被ったら</b>：' + s.deadlineDay + ' 日が希望の締切です。枠を超えた日は、' + s.discussDay + ' 日までに当事者同士で話し合って枠の人数に絞ってください。決まらない場合は ' + s.lotteryDay + ' 日にランダム抽選で決まります（過去に抽選で外れた回数が多い人が当たりやすくなります）。抽選の結果は記録に残ります。</p>'
+    + '<p><b>当番</b>：早番・遅番の当番日に休み希望を出すと警告が出ます。休む場合は代わりを探すなど事前に調整してください。</p>'
+    + '<p><b>有給</b>：消化日数は月ごと・年ごとに見られます（有給管理タブ）。</p></div>';
+}
+
+/* ================= 管理者 ================= */
+function wdChecks(name, selected) {
+  return '<div class="chkrow">' + WD.map((w, i) => '<label><input type="checkbox" name="' + name + '" value="' + i + '"' + (selected && selected.includes(i) ? ' checked' : '') + '> ' + w + '</label>').join('') + '</div>';
+}
+function readChecks(form, name) {
+  return [...form.querySelectorAll('input[name="' + name + '"]:checked')].map(x => Number(x.value)).sort();
+}
+function renderAdmin() {
+  const el = $('view-admin');
+  if (!isAdmin()) { el.innerHTML = '<div class="card">管理者ページは、利用者で「管理者」を選ぶと使えます。</div>'; return; }
+  let h = '';
+
+  // 競合と抽選
+  const conflicts = monthDates(viewY, viewM).filter(isConflict);
+  h += '<div class="card"><h2 class="sec" style="margin-top:0;">競合と抽選（' + viewM + '月）</h2>';
+  if (!conflicts.length) h += '<div class="kv">枠を超えた希望はありません。</div>';
+  conflicts.forEach(ds => {
+    const d = parseD(ds);
+    const cap = DB.settings.capacity[busyLevel(ds)];
+    const names = reqsOn(ds, 'kibou').map(r => esc(memberOf(r.memberId).name)).join('、');
+    h += '<div class="conflict-item"><b>' + (d.getMonth()+1) + '/' + d.getDate() + '（' + WD[d.getDay()] + '）</b> 枠 ' + cap + ' 人に希望 ' + kibouCount(ds) + ' 人：' + names
+      + '<br><button class="btn danger small" data-lottery="' + ds + '" style="margin-top:8px;">抽選を実行する</button></div>';
+  });
+  if (DB.lotteryLog.length) {
+    h += '<h2 class="sec">抽選の記録</h2>' + DB.lotteryLog.slice(-5).reverse().map(l =>
+      '<div class="kv">' + esc(l.at) + '：' + esc(l.date) + ' 当たり ' + l.winners.map(id => esc(memberOf(id) ? memberOf(id).name : id)).join('、') + ' ／ 外れ ' + l.losers.map(id => esc(memberOf(id) ? memberOf(id).name : id)).join('、') + '</div>').join('');
+  }
+  h += '<h2 class="sec">月の確定処理</h2><div class="kv">公休が多すぎる月で「削る」指定がなかった人の超過分を、自動的に有給として記録します（生産管理課も同じ処理です）。</div>'
+    + '<button class="btn" id="finalizeBtn">' + viewM + '月を確定する（超過分の自動有給）</button></div>';
+
+  // 設定
+  const s = DB.settings;
+  h += '<div class="card"><h2 class="sec" style="margin-top:0;">全体設定</h2>'
+    + '<label class="f">希望休の枠：○の日</label><input class="t" type="number" id="capCalm" value="' + s.capacity.calm + '">'
+    + '<label class="f">△の日</label><input class="t" type="number" id="capMid" value="' + s.capacity.mid + '">'
+    + '<label class="f">☓の日</label><input class="t" type="number" id="capBusy" value="' + s.capacity.busy + '">'
+    + '<label class="f">締切（希望）／話し合い期限／抽選日</label><div style="display:flex;gap:6px;">'
+    + '<input class="t" type="number" id="dlDay" value="' + s.deadlineDay + '"><input class="t" type="number" id="dcDay" value="' + s.discussDay + '"><input class="t" type="number" id="ltDay" value="' + s.lotteryDay + '"></div>'
+    + '<label class="f">公休の目標日数</label><input class="t" type="number" id="kokyuTarget" value="' + s.kokyuTarget + '">'
+    + '<button class="btn" id="saveSettings">設定を保存</button></div>';
+
+  // メンバー管理
+  h += '<div class="card"><h2 class="sec" style="margin-top:0;">メンバー管理</h2><div id="memberList">';
+  DB.members.forEach(m => {
+    const t = typeOf(m);
+    h += '<div class="mrow"><span class="nm">' + esc(m.name) + '</span> <span class="pill">' + esc(t.name) + '</span><span class="pill gray">' + esc(m.dept) + '</span>' + (m.active ? '' : '<span class="pill red">無効</span>')
+      + '<div class="meta">定休：' + (m.fixedOff ? m.fixedOff.map(i => WD[i]).join('・') : '固定なし（希望ベース）')
+      + ' ／ 早番：' + (m.tobanEarly.map(i => WD[i]).join('・') || 'なし') + ' ／ 遅番：' + (m.tobanLate.map(i => WD[i]).join('・') || 'なし')
+      + ' ／ 抽選で外れた回数：' + m.loseCount + '</div>'
+      + '<button class="btn ghost small" data-edit="' + m.id + '">編集</button></div>';
+  });
+  h += '</div><div id="memberForm"></div><button class="btn" id="addMember">＋ メンバーを追加</button></div>';
+
+  // 雇用形態マスター
+  h += '<div class="card"><h2 class="sec" style="margin-top:0;">雇用形態マスター</h2><div id="typeList">';
+  DB.types.forEach(t => {
+    h += '<div class="mrow"><span class="nm">' + esc(t.name) + '</span>'
+      + '<div class="meta">公休ルール：' + (t.kokyu ? 'あり' : 'なし') + ' ／ 超過時の警告：' + (t.warnOver ? 'あり' : 'なし') + ' ／ 当番：' + (t.toban ? '対象' : '対象外') + ' ／ 有給：' + (t.yukyu ? 'あり（付与 ' + t.yukyuGrant + ' 日）' : 'なし') + '</div>'
+      + '<button class="btn ghost small" data-edittype="' + t.id + '">編集</button></div>';
+  });
+  h += '</div><div id="typeForm"></div><button class="btn" id="addType">＋ 雇用形態を追加</button></div>';
+  el.innerHTML = h;
+
+  el.querySelectorAll('[data-lottery]').forEach(b => b.addEventListener('click', () => runLottery(b.dataset.lottery)));
+  $('finalizeBtn').addEventListener('click', finalizeMonth);
+  $('saveSettings').addEventListener('click', () => {
+    DB.settings.capacity.calm = Number($('capCalm').value) || 0;
+    DB.settings.capacity.mid = Number($('capMid').value) || 0;
+    DB.settings.capacity.busy = Number($('capBusy').value) || 0;
+    DB.settings.deadlineDay = Number($('dlDay').value) || 25;
+    DB.settings.discussDay = Number($('dcDay').value) || 27;
+    DB.settings.lotteryDay = Number($('ltDay').value) || 28;
+    DB.settings.kokyuTarget = Number($('kokyuTarget').value) || 9;
+    save(); renderAll();
+  });
+  el.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => memberForm(b.dataset.edit)));
+  $('addMember').addEventListener('click', () => memberForm(null));
+  el.querySelectorAll('[data-edittype]').forEach(b => b.addEventListener('click', () => typeForm(b.dataset.edittype)));
+  $('addType').addEventListener('click', () => typeForm(null));
+}
+
+function memberForm(id) {
+  const m = id ? memberOf(id) : { id: null, name: '', type: DB.types[0].id, dept: '施工課', fixedOff: [1,2], tobanEarly: [], tobanLate: [], loseCount: 0, active: true };
+  const box = $('memberForm');
+  box.innerHTML = '<form id="mf" class="card" style="background:#f9fafb;"><h2 class="sec" style="margin-top:0;">' + (id ? 'メンバー編集' : 'メンバー追加') + '</h2>'
+    + '<label class="f">名前</label><input class="t" name="name" value="' + esc(m.name) + '">'
+    + '<label class="f">雇用形態</label><select class="t" name="type">' + DB.types.map(t => '<option value="' + t.id + '"' + (t.id === m.type ? ' selected' : '') + '>' + esc(t.name) + '</option>').join('') + '</select>'
+    + '<label class="f">所属</label><input class="t" name="dept" value="' + esc(m.dept) + '">'
+    + '<label class="f">定休日（曜日）</label>' + wdChecks('fixedOff', m.fixedOff)
+    + '<label style="display:flex;gap:8px;align-items:center;font-size:15px;margin-top:8px;"><input type="checkbox" name="noFixed" style="width:20px;height:20px;"' + (m.fixedOff === null ? ' checked' : '') + '> 固定なし（希望ベース）</label>'
+    + '<label class="f">早番の当番（曜日）</label>' + wdChecks('tobanEarly', m.tobanEarly)
+    + '<label class="f">遅番の当番（曜日）</label>' + wdChecks('tobanLate', m.tobanLate)
+    + '<label style="display:flex;gap:8px;align-items:center;font-size:15px;margin-top:12px;"><input type="checkbox" name="active" style="width:20px;height:20px;"' + (m.active ? ' checked' : '') + '> 有効なメンバー</label>'
+    + '<button class="btn" type="submit">保存する</button></form>';
+  box.scrollIntoView({ behavior: 'smooth' });
+  $('mf').addEventListener('submit', e => {
+    e.preventDefault();
+    const f = e.target;
+    const data = {
+      name: f.name.value.trim() || '無名',
+      type: f.type.value, dept: f.dept.value.trim() || '施工課',
+      fixedOff: f.noFixed.checked ? null : readChecks(f, 'fixedOff'),
+      tobanEarly: readChecks(f, 'tobanEarly'), tobanLate: readChecks(f, 'tobanLate'),
+      active: f.active.checked
+    };
+    if (id) Object.assign(memberOf(id), data);
+    else DB.members.push(Object.assign({ id: 'm' + Date.now(), loseCount: 0 }, data));
+    save(); renderAll();
+  });
+}
+
+function typeForm(id) {
+  const t = id ? DB.types.find(x => x.id === id) : { id: null, name: '', kokyu: false, warnOver: false, toban: false, yukyu: true, yukyuGrant: 10 };
+  const box = $('typeForm');
+  const yn = (name, val) => '<div class="chkrow"><label><input type="radio" name="' + name + '" value="1"' + (val ? ' checked' : '') + '> あり</label><label><input type="radio" name="' + name + '" value="0"' + (!val ? ' checked' : '') + '> なし</label></div>';
+  box.innerHTML = '<form id="tf" class="card" style="background:#f9fafb;"><h2 class="sec" style="margin-top:0;">' + (id ? '雇用形態の編集' : '雇用形態の追加') + '</h2>'
+    + '<label class="f">名称</label><input class="t" name="name" value="' + esc(t.name) + '">'
+    + '<label class="f">公休ルール</label>' + yn('kokyu', t.kokyu)
+    + '<label class="f">公休超過時の警告</label>' + yn('warnOver', t.warnOver)
+    + '<label class="f">早番・遅番の当番</label>' + yn('toban', t.toban)
+    + '<label class="f">有給</label>' + yn('yukyu', t.yukyu)
+    + '<label class="f">有給の付与日数（年）</label><input class="t" type="number" name="grant" value="' + t.yukyuGrant + '">'
+    + '<button class="btn" type="submit">保存する</button></form>';
+  box.scrollIntoView({ behavior: 'smooth' });
+  $('tf').addEventListener('submit', e => {
+    e.preventDefault();
+    const f = e.target;
+    const data = { name: f.name.value.trim() || '無名', kokyu: f.kokyu.value === '1', warnOver: f.warnOver.value === '1', toban: f.toban.value === '1', yukyu: f.yukyu.value === '1', yukyuGrant: Number(f.grant.value) || 0 };
+    if (id) Object.assign(DB.types.find(x => x.id === id), data);
+    else DB.types.push(Object.assign({ id: 't' + Date.now() }, data));
+    save(); renderAll();
+  });
+}
+
+function runLottery(ds) {
+  const cap = DB.settings.capacity[busyLevel(ds)];
+  const cands = DB.requests.filter(r => r.date === ds && r.kind === 'kibou' && r.status === 'pending');
+  if (cands.length <= cap) return;
+  // 外れた回数が多い人ほど当たりやすく（重み = 1 + 外れ回数）
+  const pool = [...cands];
+  const winners = [];
+  while (winners.length < cap && pool.length) {
+    const totalW = pool.reduce((a, r) => a + 1 + (memberOf(r.memberId) ? memberOf(r.memberId).loseCount : 0), 0);
+    let x = Math.random() * totalW, idx = 0;
+    for (let i = 0; i < pool.length; i++) { x -= 1 + (memberOf(pool[i].memberId) ? memberOf(pool[i].memberId).loseCount : 0); if (x <= 0) { idx = i; break; } }
+    winners.push(pool.splice(idx, 1)[0]);
+  }
+  const losers = pool;
+  winners.forEach(r => { r.status = 'confirmed'; });
+  losers.forEach(r => { r.status = 'lost'; const mm = memberOf(r.memberId); if (mm) mm.loseCount++; });
+  DB.lotteryLog.push({ at: new Date().toLocaleString('ja-JP'), date: ds, winners: winners.map(r => r.memberId), losers: losers.map(r => r.memberId) });
+  save(); renderAll();
+}
+
+function finalizeMonth() {
+  let made = 0;
+  DB.members.forEach(m => {
+    if (!m.active) return;
+    const ki = kokyuInfo(m, viewY, viewM);
+    if (!ki || ki.over <= 0) return;
+    const need = ki.over - ki.cuts - ki.autos;
+    if (need <= 0) return;
+    const fixed = fixedOffDates(m, viewY, viewM);
+    const targets = fixed.filter(ds => !myReq(m.id, ds, 'cut') && !DB.requests.find(r => r.memberId === m.id && r.date === ds && r.kind === 'yukyu' && r.status === 'auto')).slice(-need);
+    targets.forEach(ds => { DB.requests.push({ id: 'r' + Date.now() + Math.floor(Math.random()*9999), memberId: m.id, date: ds, kind: 'yukyu', status: 'auto', note: '公休超過分の自動有給' }); made++; });
+  });
+  save(); renderAll();
+  alert(made ? made + ' 件を自動有給として記録しました。' : '自動有給にする超過分はありませんでした。');
+}
+
+/* ================= タブ・初期化 ================= */
+function renderAll() {
+  renderUserBar();
+  ['cal','mine','leave','rules','admin'].forEach(k => $('view-' + k).classList.toggle('hidden', k !== currentTab));
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === currentTab));
+  if (currentTab === 'cal') renderCal();
+  if (currentTab === 'mine') renderMine();
+  if (currentTab === 'leave') renderLeave();
+  if (currentTab === 'rules') renderRules();
+  if (currentTab === 'admin') renderAdmin();
+}
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => { currentTab = b.dataset.tab; renderAll(); window.scrollTo({ top: 0 }); }));
+$('userSelect').addEventListener('change', e => { currentUserId = e.target.value; localStorage.setItem(LS_USER, currentUserId); renderAll(); });
+renderAll();
+</script>
+</body>
+</html>
