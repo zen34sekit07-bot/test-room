@@ -81,6 +81,20 @@
     .hidden { display: none !important; }
     .rules p, .rules li { font-size: 15px; line-height: 1.7; }
     .conflict-item { border: 2px solid #dc2626; background: #fff7f7; border-radius: 12px; padding: 12px; margin-bottom: 10px; font-size: 15px; line-height: 1.6; }
+    table.ltbl { border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+    table.ltbl th, table.ltbl td { border: 1px solid #c9c9c7; padding: 3px 2px; text-align: center; min-width: 24px; height: 30px; }
+    table.ltbl thead th { background: #f4f4f2; position: sticky; top: 0; z-index: 2; }
+    table.ltbl th.nm, table.ltbl td.nm { position: sticky; left: 0; z-index: 1; text-align: left; font-weight: bold; font-size: 12px; padding: 3px 6px; min-width: 86px; }
+    table.ltbl thead th.nm { z-index: 3; }
+    table.ltbl td.tomo, table.ltbl th.tomo { background: #fef9c3; }
+    table.ltbl tr.t-seishain td.nm { background: #ffffff; }
+    table.ltbl tr.t-keiyaku td.nm { background: #f0fdf4; }
+    table.ltbl tr.t-part td.nm { background: #fdf2f8; }
+    table.ltbl tr.t-itaku td.nm { background: #eff6ff; }
+    .mk { font-weight: bold; font-size: 13px; }
+    .mk-fixed { color: #262626; } .mk-kibou { color: #1d4ed8; } .mk-yukyu { color: #7c3aed; } .mk-auto { color: #d97706; }
+    .mk-duty { display: block; font-size: 9px; color: #2563eb; font-weight: bold; }
+    .mk-cut { color: #9ca3af; font-size: 11px; }
 </style>
 </head>
 <body>
@@ -99,6 +113,7 @@
     </div>
 
     <div id="view-cal"></div>
+    <div id="view-list" class="hidden"></div>
     <div id="view-mine" class="hidden"></div>
     <div id="view-leave" class="hidden"></div>
     <div id="view-rules" class="hidden"></div>
@@ -107,6 +122,7 @@
 
 <div class="tabs">
     <button data-tab="cal" class="on">カレンダー</button>
+    <button data-tab="list">一覧表</button>
     <button data-tab="mine">自分の状況</button>
     <button data-tab="leave">有給管理</button>
     <button data-tab="rules">ルール</button>
@@ -139,7 +155,7 @@ function seedDB() {
     M('m04','高橋 大輔','seishain','施工課',[1,2],[3],[4]),
     M('m05','田中 美咲','seishain','施工課',[3,5],[4],[0]),
     M('m06','伊藤 直樹','seishain','施工課',[1,4],[5],[1]),
-    M('m07','渡辺 葵','seishain','施工課',[2,3],[6],[6]),
+    M('m07','渡辺 葵','seishain','施工課',[2,3],[6],[6]), // 退職予定のため 12/9〜12/31 が有給消化期間（サンプル）
     M('m08','山本 蓮','seishain','施工課',[1,5],[0],[0]),
     M('m09','中村 悠','seishain','施工課',[4,5],[1],[5]),
     M('m10','小林 駿','seishain','施工課',[1,2],[2],[1]),
@@ -156,13 +172,32 @@ function seedDB() {
     M('m21','運送・岡田','itaku','運送',[0,1,2,4,5,6],[],[]),
     M('m22','運送・西村','itaku','運送',[0,1,3,4,5,6],[],[])
   ];
-  return {
+  const db = {
     types, members,
     requests: [],       // {id, memberId, date, kind:'kibou'|'yukyu'|'cut', status:'pending'|'confirmed'|'lost'|'auto', note}
     busyOverride: {},   // date -> 'calm'|'mid'|'busy'
     settings: { capacity: { calm:3, mid:2, busy:1 }, deadlineDay:25, discussDay:27, lotteryDay:28, kokyuTarget:9 },
     lotteryLog: []      // {at, date, winners:[], losers:[]}
   };
+  // 有給消化期間のサンプル（退職予定のメンバー）
+  const m07 = db.members.find(m => m.id === 'm07');
+  m07.leaveFrom = '2026-12-09'; m07.leaveTo = '2026-12-31';
+  db.requests.push(...leaveRequestsFor(db, m07));
+  return db;
+}
+function leaveRequestsFor(db, m) {
+  // 有給消化期間：定休日以外の日を有給（確定）として生成する
+  if (!m.leaveFrom || !m.leaveTo) return [];
+  const out = [];
+  const cur = parseD(m.leaveFrom), end = parseD(m.leaveTo);
+  while (cur <= end) {
+    const ds = cur.getFullYear() + '-' + String(cur.getMonth()+1).padStart(2,'0') + '-' + String(cur.getDate()).padStart(2,'0');
+    if (!(m.fixedOff && m.fixedOff.includes(cur.getDay()))) {
+      out.push({ id: 'lv' + m.id + ds, memberId: m.id, date: ds, kind: 'yukyu', status: 'confirmed', note: '有給消化期間' });
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
 }
 let DB;
 try { DB = JSON.parse(localStorage.getItem(LS_KEY)) || seedDB(); } catch(e) { DB = seedDB(); }
@@ -325,6 +360,53 @@ function renderCal() {
   el.querySelectorAll('.cell').forEach(c => c.addEventListener('click', () => openDay(c.dataset.date)));
 }
 
+/* ================= 一覧表 ================= */
+function cellMark(m, ds) {
+  const wd = parseD(ds).getDay();
+  const cut = myReq(m.id, ds, 'cut');
+  const auto = DB.requests.find(r => r.memberId === m.id && r.date === ds && r.kind === 'yukyu' && r.status === 'auto');
+  const yk = myReq(m.id, ds, 'yukyu');
+  const kb = DB.requests.find(r => r.memberId === m.id && r.date === ds && r.kind === 'kibou');
+  const isFixed = m.fixedOff && m.fixedOff.includes(wd);
+  let mark = '';
+  if (isFixed && !cut) mark = auto ? '<span class="mk mk-auto">有</span>' : '<span class="mk mk-fixed">休</span>';
+  else if (yk) mark = '<span class="mk mk-yukyu">有</span>';
+  else if (kb && kb.status !== 'lost') mark = '<span class="mk mk-kibou">休</span>';
+  else if (kb && kb.status === 'lost') mark = '<span class="mk-cut">外</span>';
+  else if (cut) mark = '<span class="mk-cut">出</span>';
+  const duties = myDuty(m, ds);
+  if (duties.length && !mark) mark = '<span class="mk-duty">' + duties.map(x => x[0]).join('・') + '</span>';
+  else if (duties.length) mark += '<span class="mk-duty">' + duties.map(x => x[0]).join('・') + '</span>';
+  return mark;
+}
+function renderList() {
+  const el = $('view-list');
+  const dates = monthDates(viewY, viewM);
+  let h = '<div class="monthbar"><button class="mnav" id="prevM2">‹ 前月</button><div class="mtitle">' + viewY + '年 ' + viewM + '月 休日一覧表</div><button class="mnav" id="nextM2">翌月 ›</button></div>';
+  h += '<div class="card" style="padding:8px;"><div class="tblwrap"><table class="ltbl"><thead>';
+  h += '<tr><th class="nm">名前</th>' + dates.map(ds => { const d = parseD(ds); return '<th class="' + (rokuyoOf(ds) === '友引' ? 'tomo' : '') + '"' + (d.getDay() === 0 ? ' style="color:#dc2626;"' : d.getDay() === 6 ? ' style="color:#1d4ed8;"' : '') + '>' + WD[d.getDay()] + '</th>'; }).join('') + '<th>休計</th></tr>';
+  h += '<tr><th class="nm"></th>' + dates.map(ds => { const d = parseD(ds); return '<th class="' + (rokuyoOf(ds) === '友引' ? 'tomo' : '') + '">' + d.getDate() + '</th>'; }).join('') + '<th></th></tr></thead><tbody>';
+  DB.members.filter(m => m.active).forEach((m, idx) => {
+    let offCount = 0;
+    h += '<tr class="t-' + m.type + '"><td class="nm">' + (idx + 1) + '. ' + esc(m.name) + '</td>';
+    dates.forEach(ds => {
+      const mk = cellMark(m, ds);
+      if (mk.includes('>休<') || mk.includes('>有<')) offCount++;
+      h += '<td class="' + (rokuyoOf(ds) === '友引' ? 'tomo' : '') + '">' + mk + '</td>';
+    });
+    h += '<td><b>' + offCount + '</b></td></tr>';
+  });
+  h += '<tr><td class="nm" style="background:#f4f4f2;">休みの人数</td>' + dates.map(ds => {
+    let n = 0;
+    DB.members.forEach(m => { if (!m.active) return; const wd = parseD(ds).getDay(); const off = (m.fixedOff && m.fixedOff.includes(wd) && !myReq(m.id, ds, 'cut')) || myReq(m.id, ds, 'kibou') || myReq(m.id, ds, 'yukyu'); if (off) n++; });
+    return '<td style="background:#f4f4f2;"><b>' + n + '</b></td>';
+  }).join('') + '<td style="background:#f4f4f2;"></td></tr>';
+  h += '</tbody></table></div><div class="legend">休（黒）＝定休 ／ 休（青）＝希望休 ／ 有（紫）＝有給 ／ 有（橙）＝公休超過の自動有給 ／ 黄色い列＝友引 ／ セル下の「早・遅」は当番。横にスクロールできます。</div></div>';
+  el.innerHTML = h;
+  $('prevM2').addEventListener('click', () => { viewM--; if (viewM < 1) { viewM = 12; viewY--; } renderAll(); });
+  $('nextM2').addEventListener('click', () => { viewM++; if (viewM > 12) { viewM = 1; viewY++; } renderAll(); });
+}
+
 /* ================= 日シート ================= */
 function openDay(ds) {
   const d = parseD(ds);
@@ -426,6 +508,7 @@ function renderMine() {
   if (t.yukyu) {
     h += '<div class="kv" style="margin-top:8px;">有給：今年の消化 <b>' + yukyuUsed(m.id, viewY) + ' 日</b> ／ 付与 ' + t.yukyuGrant + ' 日（目安）<br>月別：' + [1,2,3,4,5,6,7,8,9,10,11,12].map(mo => mo + '月 ' + yukyuUsed(m.id, viewY, mo) + '日').join(' ／ ') + '</div>';
   }
+  if (m.leaveFrom && m.leaveTo) h += '<div class="warn">有給消化期間：' + m.leaveFrom + ' 〜 ' + m.leaveTo + '（定休日以外は有給として記録されます）</div>';
   const myReqs = DB.requests.filter(r => r.memberId === m.id && monthDates(viewY, viewM).includes(r.date)).sort((a,b) => a.date < b.date ? -1 : 1);
   h += '<h2 class="sec">今月の希望・申請</h2>';
   h += myReqs.length ? myReqs.map(r => {
@@ -515,7 +598,8 @@ function renderAdmin() {
     h += '<div class="mrow"><span class="nm">' + esc(m.name) + '</span> <span class="pill">' + esc(t.name) + '</span><span class="pill gray">' + esc(m.dept) + '</span>' + (m.active ? '' : '<span class="pill red">無効</span>')
       + '<div class="meta">定休：' + (m.fixedOff ? m.fixedOff.map(i => WD[i]).join('・') : '固定なし（希望ベース）')
       + ' ／ 早番：' + (m.tobanEarly.map(i => WD[i]).join('・') || 'なし') + ' ／ 遅番：' + (m.tobanLate.map(i => WD[i]).join('・') || 'なし')
-      + ' ／ 抽選で外れた回数：' + m.loseCount + '</div>'
+      + ' ／ 抽選で外れた回数：' + m.loseCount
+      + (m.leaveFrom && m.leaveTo ? '<br>有給消化期間：' + m.leaveFrom + ' 〜 ' + m.leaveTo : '') + '</div>'
       + '<button class="btn ghost small" data-edit="' + m.id + '">編集</button></div>';
   });
   h += '</div><div id="memberForm"></div><button class="btn" id="addMember">＋ メンバーを追加</button></div>';
@@ -559,6 +643,9 @@ function memberForm(id) {
     + '<label style="display:flex;gap:8px;align-items:center;font-size:15px;margin-top:8px;"><input type="checkbox" name="noFixed" style="width:20px;height:20px;"' + (m.fixedOff === null ? ' checked' : '') + '> 固定なし（希望ベース）</label>'
     + '<label class="f">早番の当番（曜日）</label>' + wdChecks('tobanEarly', m.tobanEarly)
     + '<label class="f">遅番の当番（曜日）</label>' + wdChecks('tobanLate', m.tobanLate)
+    + '<label class="f">有給消化期間（退職時など）開始日</label><input class="t" type="date" name="leaveFrom" value="' + (m.leaveFrom || '') + '">'
+    + '<label class="f">有給消化期間 終了日</label><input class="t" type="date" name="leaveTo" value="' + (m.leaveTo || '') + '">'
+    + '<div class="kv" style="color:#555555;">期間を入れると、定休日以外の日が自動で有給（消化）として記録されます。</div>'
     + '<label style="display:flex;gap:8px;align-items:center;font-size:15px;margin-top:12px;"><input type="checkbox" name="active" style="width:20px;height:20px;"' + (m.active ? ' checked' : '') + '> 有効なメンバー</label>'
     + '<button class="btn" type="submit">保存する</button></form>';
   box.scrollIntoView({ behavior: 'smooth' });
@@ -570,10 +657,15 @@ function memberForm(id) {
       type: f.type.value, dept: f.dept.value.trim() || '施工課',
       fixedOff: f.noFixed.checked ? null : readChecks(f, 'fixedOff'),
       tobanEarly: readChecks(f, 'tobanEarly'), tobanLate: readChecks(f, 'tobanLate'),
+      leaveFrom: f.leaveFrom.value || null, leaveTo: f.leaveTo.value || null,
       active: f.active.checked
     };
-    if (id) Object.assign(memberOf(id), data);
-    else DB.members.push(Object.assign({ id: 'm' + Date.now(), loseCount: 0 }, data));
+    let target;
+    if (id) { target = memberOf(id); Object.assign(target, data); }
+    else { target = Object.assign({ id: 'm' + Date.now(), loseCount: 0 }, data); DB.members.push(target); }
+    // 有給消化期間の自動記録を作り直す
+    DB.requests = DB.requests.filter(r => !r.id.startsWith('lv' + target.id));
+    DB.requests.push(...leaveRequestsFor(DB, target));
     save(); renderAll();
   });
 }
@@ -640,9 +732,10 @@ function finalizeMonth() {
 /* ================= タブ・初期化 ================= */
 function renderAll() {
   renderUserBar();
-  ['cal','mine','leave','rules','admin'].forEach(k => $('view-' + k).classList.toggle('hidden', k !== currentTab));
+  ['cal','list','mine','leave','rules','admin'].forEach(k => $('view-' + k).classList.toggle('hidden', k !== currentTab));
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === currentTab));
   if (currentTab === 'cal') renderCal();
+  if (currentTab === 'list') renderList();
   if (currentTab === 'mine') renderMine();
   if (currentTab === 'leave') renderLeave();
   if (currentTab === 'rules') renderRules();
